@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mushref-Daris registrering</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* (samme styles som tidligere) */
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 0 20px;
+            background: #f5f7fa;
+        }
+        h1 { color: #1f6feb; }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        button {
+            background: #1f6feb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 5px;
+        }
+        button:hover { background: #0f5fd9; }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.secondary:hover { background: #5a6268; }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 15px 0;
+            align-items: center;
+        }
+        select, input[type="text"], input[type="date"], textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 8px 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        label {
+            font-weight: 600;
+            display: block;
+            margin-top: 10px;
+        }
+        .daris-row {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            background: #f8f9fa;
+        }
+        .daris-row h4 {
+            margin: 0 0 10px 0;
+            color: #1f6feb;
+        }
+        .activity {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 8px 0;
+        }
+        .activity select {
+            width: auto;
+            flex: 1;
+        }
+        .reason-field {
+            margin-top: 5px;
+        }
+        .hidden { display: none; }
+        #ugeNr {
+            font-weight: bold;
+            color: #28a745;
+        }
+        #darisCounter {
+            font-weight: bold;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>📋 Mushref-Daris registrering</h1>
+    <div class="card">
+        <label for="mushrifSelect">Vælg Mushref:</label>
+        <select id="mushrifSelect">
+            <option value="">-- Vælg --</option>
+        </select>
+
+        <div id="mainOptions" class="btn-group hidden">
+            <button id="deltogBtn" class="primary">✅ Jeg deltog</button>
+            <button id="aflystBtn" class="secondary">❌ Halaqa aflyst</button>
+        </div>
+
+        <!-- Sektion for "Jeg deltog" -->
+        <div id="deltogSection" class="hidden">
+            <hr>
+            <label for="dato">Dato:</label>
+            <input type="date" id="dato">
+            <p>Uge nummer: <span id="ugeNr">-</span></p>
+
+            <div id="bookInfo" class="hidden">
+                <label>Bog:</label>
+                <p id="bookName"></p>
+            </div>
+
+            <div id="sideTalContainer" class="hidden">
+                <label for="sideTal">Sidetal (f.eks. 10):</label>
+                <input type="text" id="sideTal" placeholder="f.eks. 10">
+            </div>
+
+            <div id="darisContainer" class="hidden">
+                <h3>Daris oversigt</h3>
+                <div id="currentDaris"></div>
+                <div class="btn-group">
+                    <button id="prevDaris" class="secondary" disabled>← Forrige</button>
+                    <span id="darisCounter">1 / 0</span>
+                    <button id="nextDaris" class="secondary">Næste →</button>
+                </div>
+            </div>
+
+            <button id="sendDeltogData" class="primary hidden">📤 Send data</button>
+        </div>
+
+        <!-- Sektion for "Halaqa aflyst" -->
+        <div id="aflystSection" class="hidden">
+            <hr>
+            <label for="aflystDato">Dato:</label>
+            <input type="date" id="aflystDato">
+            <p>Uge nummer: <span id="aflystUgeNr">-</span></p>
+
+            <div id="aflystAarsagButtons" class="btn-group hidden">
+                <button id="aflystMedAarsag" class="secondary">Aflyst med årsag</button>
+                <button id="aflystUdenAarsag" class="secondary">Aflyst uden årsag</button>
+            </div>
+
+            <div id="aarsagContainer" class="hidden">
+                <label for="aarsagText">Årsag:</label>
+                <textarea id="aarsagText" rows="3" placeholder="Skriv årsag..."></textarea>
+            </div>
+
+            <div id="aflystDarisContainer" class="hidden">
+                <h3>Registrér lørdagsmøde for daris</h3>
+                <div id="aflystCurrentDaris"></div>
+                <div class="btn-group">
+                    <button id="aflystPrevDaris" class="secondary" disabled>← Forrige</button>
+                    <span id="aflystDarisCounter">1 / 0</span>
+                    <button id="aflystNextDaris" class="secondary">Næste →</button>
+                </div>
+            </div>
+
+            <button id="sendAflystData" class="primary hidden">📤 Send data</button>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // === SUPABASE KONFIGURATION ===
+            const SUPABASE_URL = 'https://nnqycdwvhgnltzjyycmp.supabase.co';   // din URL
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ucXljZHd2aGdubHR6anl5Y21wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzMjU1NjgsImV4cCI6MjA4NjkwMTU2OH0.elueq0ucTlH_7x3rxnTe6zQUAIwFquc_dhN_mPdykKU';   // din anon key
+            const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+            // DOM elementer
+            const mushrifSelect = document.getElementById('mushrifSelect');
+            const mainOptions = document.getElementById('mainOptions');
+            const deltogBtn = document.getElementById('deltogBtn');
+            const aflystBtn = document.getElementById('aflystBtn');
+            const deltogSection = document.getElementById('deltogSection');
+            const aflystSection = document.getElementById('aflystSection');
+
+            // Deltog elementer
+            const datoInput = document.getElementById('dato');
+            const ugeNrSpan = document.getElementById('ugeNr');
+            const bookInfo = document.getElementById('bookInfo');
+            const bookName = document.getElementById('bookName');
+            const sideTalContainer = document.getElementById('sideTalContainer');
+            const sideTalInput = document.getElementById('sideTal');
+            const darisContainer = document.getElementById('darisContainer');
+            const currentDarisDiv = document.getElementById('currentDaris');
+            const prevBtn = document.getElementById('prevDaris');
+            const nextBtn = document.getElementById('nextDaris');
+            const darisCounter = document.getElementById('darisCounter');
+            const sendDeltogData = document.getElementById('sendDeltogData');
+
+            // Aflyst elementer
+            const aflystDato = document.getElementById('aflystDato');
+            const aflystUgeNr = document.getElementById('aflystUgeNr');
+            const aflystAarsagButtons = document.getElementById('aflystAarsagButtons');
+            const aflystMedAarsag = document.getElementById('aflystMedAarsag');
+            const aflystUdenAarsag = document.getElementById('aflystUdenAarsag');
+            const aarsagContainer = document.getElementById('aarsagContainer');
+            const aarsagText = document.getElementById('aarsagText');
+            const aflystDarisContainer = document.getElementById('aflystDarisContainer');
+            const aflystCurrentDaris = document.getElementById('aflystCurrentDaris');
+            const aflystPrevBtn = document.getElementById('aflystPrevDaris');
+            const aflystNextBtn = document.getElementById('aflystNextDaris');
+            const aflystDarisCounter = document.getElementById('aflystDarisCounter');
+            const sendAflystData = document.getElementById('sendAflystData');
+
+            // State
+            let selectedMushrifId = null;
+            let selectedMushrifNavn = null;
+            let currentBook = '';
+            let darisListe = [];
+            let darisState = [];
+            let currentDarisIndex = 0;
+            let aflystDarisState = [];
+            let aflystCurrentIndex = 0;
+            let aflystType = null; // 'med' eller 'uden'
+
+            // === HJÆLPEFUNKTIONER ===
+            function getWeekNumber(date) {
+                const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+                const dayNum = d.getUTCDay() || 7;
+                d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+                const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+                return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            }
+
+            // Hent mushrifs fra databasen
+            async function loadMushrifs() {
+                try {
+                    const { data, error } = await supabase
+                        .from('mushrif_relations')
+                        .select('id, mushrif_navn, bog, daris_liste')
+                        .order('mushrif_navn');
+                    if (error) throw error;
+
+                    mushrifSelect.innerHTML = '<option value="">-- Vælg --</option>';
+                    data.forEach(m => {
+                        const option = document.createElement('option');
+                        option.value = m.id;
+                        option.textContent = m.mushrif_navn;
+                        option.dataset.bog = m.bog;
+                        option.dataset.daris = JSON.stringify(m.daris_liste || []);
+                        mushrifSelect.appendChild(option);
+                    });
+                } catch (err) {
+                    console.error('Fejl ved hentning af mushrifs:', err);
+                    alert('Kunne ikke hente mushrifs. Tjek konsol.');
+                }
+            }
+
+            // Når mushref vælges
+            mushrifSelect.addEventListener('change', (e) => {
+                const option = e.target.selectedOptions[0];
+                if (option && option.value) {
+                    selectedMushrifId = option.value;
+                    selectedMushrifNavn = option.textContent;
+                    currentBook = option.dataset.bog || 'Ingen bog valgt';
+                    darisListe = JSON.parse(option.dataset.daris || '[]');
+                    mainOptions.classList.remove('hidden');
+                    deltogSection.classList.add('hidden');
+                    aflystSection.classList.add('hidden');
+                } else {
+                    selectedMushrifId = null;
+                    mainOptions.classList.add('hidden');
+                }
+            });
+
+            // === DELTOG LOGIK (uændret) ===
+            function initDarisState() {
+                darisState = darisListe.map(navn => ({
+                    navn,
+                    halaqaStatus: 'deltog',
+                    halaqaReason: '',
+                    lordagStatus: 'deltog',
+                    lordagReason: ''
+                }));
+                currentDarisIndex = 0;
+            }
+
+            function renderCurrentDaris() {
+                if (darisState.length === 0) {
+                    currentDarisDiv.innerHTML = '<p>Ingen daris tilknyttet.</p>';
+                    return;
+                }
+                const d = darisState[currentDarisIndex];
+                const idx = currentDarisIndex;
+                const html = `
+                    <div class="daris-row">
+                        <h4>${d.navn}</h4>
+                        <div class="activity">
+                            <span><strong>Halaqa:</strong></span>
+                            <select data-idx="${idx}" data-activity="halaqa">
+                                <option value="deltog" ${d.halaqaStatus === 'deltog' ? 'selected' : ''}>Deltog</option>
+                                <option value="aflystMed" ${d.halaqaStatus === 'aflystMed' ? 'selected' : ''}>Aflyst med årsag</option>
+                                <option value="aflystUden" ${d.halaqaStatus === 'aflystUden' ? 'selected' : ''}>Aflyst uden årsag</option>
+                            </select>
+                        </div>
+                        <div class="reason-field ${d.halaqaStatus === 'aflystMed' ? '' : 'hidden'}" data-reason="halaqa-${idx}">
+                            <input type="text" placeholder="Årsag (halaqa)" value="${d.halaqaReason}">
+                        </div>
+                        <div class="activity">
+                            <span><strong>Lørdagsmøde:</strong></span>
+                            <select data-idx="${idx}" data-activity="lordag">
+                                <option value="deltog" ${d.lordagStatus === 'deltog' ? 'selected' : ''}>Deltog</option>
+                                <option value="aflystMed" ${d.lordagStatus === 'aflystMed' ? 'selected' : ''}>Aflyst med årsag</option>
+                                <option value="aflystUden" ${d.lordagStatus === 'aflystUden' ? 'selected' : ''}>Aflyst uden årsag</option>
+                            </select>
+                        </div>
+                        <div class="reason-field ${d.lordagStatus === 'aflystMed' ? '' : 'hidden'}" data-reason="lordag-${idx}">
+                            <input type="text" placeholder="Årsag (lørdag)" value="${d.lordagReason}">
+                        </div>
+                    </div>
+                `;
+                currentDarisDiv.innerHTML = html;
+                darisCounter.textContent = `${currentDarisIndex + 1} / ${darisState.length}`;
+                prevBtn.disabled = currentDarisIndex === 0;
+                nextBtn.textContent = currentDarisIndex === darisState.length - 1 ? 'Færdig' : 'Næste →';
+
+                // Event listeners
+                currentDarisDiv.querySelectorAll('select').forEach(select => {
+                    select.addEventListener('change', (e) => {
+                        const idx = e.target.dataset.idx;
+                        const activity = e.target.dataset.activity;
+                        const value = e.target.value;
+                        const row = e.target.closest('.daris-row');
+
+                        if (activity === 'halaqa') {
+                            darisState[idx].halaqaStatus = value;
+                            if (value !== 'aflystMed') darisState[idx].halaqaReason = '';
+                            const reasonDiv = row.querySelector(`[data-reason="halaqa-${idx}"]`);
+                            if (reasonDiv) reasonDiv.classList.toggle('hidden', value !== 'aflystMed');
+                        } else {
+                            darisState[idx].lordagStatus = value;
+                            if (value !== 'aflystMed') darisState[idx].lordagReason = '';
+                            const reasonDiv = row.querySelector(`[data-reason="lordag-${idx}"]`);
+                            if (reasonDiv) reasonDiv.classList.toggle('hidden', value !== 'aflystMed');
+                        }
+                    });
+                });
+
+                currentDarisDiv.querySelectorAll('.reason-field input').forEach(input => {
+                    input.addEventListener('input', (e) => {
+                        const parent = e.target.closest('.reason-field');
+                        if (parent?.dataset.reason) {
+                            const [activity, idxStr] = parent.dataset.reason.split('-');
+                            const idx = parseInt(idxStr);
+                            if (activity === 'halaqa') darisState[idx].halaqaReason = e.target.value;
+                            else if (activity === 'lordag') darisState[idx].lordagReason = e.target.value;
+                        }
+                    });
+                });
+            }
+
+            function opdaterDeltogVisning() {
+                const harDato = datoInput.value.trim() !== '';
+                if (harDato) {
+                    bookInfo.classList.remove('hidden');
+                    bookName.textContent = currentBook;
+                    sideTalContainer.classList.remove('hidden');
+                } else {
+                    bookInfo.classList.add('hidden');
+                    sideTalContainer.classList.add('hidden');
+                    darisContainer.classList.add('hidden');
+                    sendDeltogData.classList.add('hidden');
+                    return;
+                }
+
+                const harSidetal = sideTalInput.value.trim() !== '';
+                darisContainer.classList.toggle('hidden', !harSidetal);
+                if (harSidetal && darisState.length > 0) {
+                    renderCurrentDaris();
+                    sendDeltogData.classList.remove('hidden');
+                } else {
+                    sendDeltogData.classList.add('hidden');
+                }
+            }
+
+            datoInput.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    const date = new Date(e.target.value);
+                    ugeNrSpan.textContent = getWeekNumber(date);
+                } else {
+                    ugeNrSpan.textContent = '-';
+                }
+                opdaterDeltogVisning();
+            });
+
+            sideTalInput.addEventListener('input', opdaterDeltogVisning);
+
+            prevBtn.addEventListener('click', () => {
+                if (currentDarisIndex > 0) {
+                    currentDarisIndex--;
+                    renderCurrentDaris();
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentDarisIndex < darisState.length - 1) {
+                    currentDarisIndex++;
+                    renderCurrentDaris();
+                } else {
+                    alert('Du har gennemgået alle daris. Klik på "Send data" for at gemme.');
+                }
+            });
+
+            // === AFLYST LOGIK (ændret) ===
+            function initAflystState() {
+                aflystDarisState = darisListe.map(navn => ({
+                    navn,
+                    lordagStatus: 'deltog',
+                    lordagReason: ''
+                }));
+                aflystCurrentIndex = 0;
+            }
+
+            function renderAflystDaris() {
+                if (aflystDarisState.length === 0) {
+                    aflystCurrentDaris.innerHTML = '<p>Ingen daris tilknyttet.</p>';
+                    return;
+                }
+                const d = aflystDarisState[aflystCurrentIndex];
+                const idx = aflystCurrentIndex;
+                const html = `
+                    <div class="daris-row">
+                        <h4>${d.navn}</h4>
+                        <div class="activity">
+                            <span><strong>Lørdagsmøde:</strong></span>
+                            <select data-idx="${idx}" data-activity="lordag">
+                                <option value="deltog" ${d.lordagStatus === 'deltog' ? 'selected' : ''}>Deltog</option>
+                                <option value="aflystMed" ${d.lordagStatus === 'aflystMed' ? 'selected' : ''}>Aflyst med årsag</option>
+                                <option value="aflystUden" ${d.lordagStatus === 'aflystUden' ? 'selected' : ''}>Aflyst uden årsag</option>
+                            </select>
+                        </div>
+                        <div class="reason-field ${d.lordagStatus === 'aflystMed' ? '' : 'hidden'}" data-reason="lordag-${idx}">
+                            <input type="text" placeholder="Årsag (lørdag)" value="${d.lordagReason}">
+                        </div>
+                    </div>
+                `;
+                aflystCurrentDaris.innerHTML = html;
+                aflystDarisCounter.textContent = `${aflystCurrentIndex + 1} / ${aflystDarisState.length}`;
+                aflystPrevBtn.disabled = aflystCurrentIndex === 0;
+                aflystNextBtn.textContent = aflystCurrentIndex === aflystDarisState.length - 1 ? 'Færdig' : 'Næste →';
+
+                aflystCurrentDaris.querySelectorAll('select').forEach(select => {
+                    select.addEventListener('change', (e) => {
+                        const idx = e.target.dataset.idx;
+                        const value = e.target.value;
+                        const row = e.target.closest('.daris-row');
+                        aflystDarisState[idx].lordagStatus = value;
+                        if (value !== 'aflystMed') aflystDarisState[idx].lordagReason = '';
+                        const reasonDiv = row.querySelector(`[data-reason="lordag-${idx}"]`);
+                        if (reasonDiv) reasonDiv.classList.toggle('hidden', value !== 'aflystMed');
+                    });
+                });
+
+                aflystCurrentDaris.querySelectorAll('.reason-field input').forEach(input => {
+                    input.addEventListener('input', (e) => {
+                        const parent = e.target.closest('.reason-field');
+                        if (parent?.dataset.reason) {
+                            const [activity, idxStr] = parent.dataset.reason.split('-');
+                            const idx = parseInt(idxStr);
+                            if (activity === 'lordag') aflystDarisState[idx].lordagReason = e.target.value;
+                        }
+                    });
+                });
+            }
+
+            aflystDato.addEventListener('change', (e) => {
+                if (e.target.value) {
+                    const date = new Date(e.target.value);
+                    aflystUgeNr.textContent = getWeekNumber(date);
+                    aflystAarsagButtons.classList.remove('hidden');
+                    aflystDarisContainer.classList.add('hidden');
+                    sendAflystData.classList.add('hidden');
+                    aflystType = null;
+                    aarsagContainer.classList.add('hidden');
+                    aarsagText.value = '';
+                } else {
+                    aflystUgeNr.textContent = '-';
+                    aflystAarsagButtons.classList.add('hidden');
+                    aflystDarisContainer.classList.add('hidden');
+                    sendAflystData.classList.add('hidden');
+                }
+            });
+
+            aflystMedAarsag.addEventListener('click', () => {
+                aflystType = 'med';
+                aarsagContainer.classList.remove('hidden');
+                aflystDarisContainer.classList.add('hidden');
+                sendAflystData.classList.add('hidden');
+                aarsagText.value = '';
+            });
+
+            aflystUdenAarsag.addEventListener('click', () => {
+                aflystType = 'uden';
+                aarsagContainer.classList.add('hidden');
+                aarsagText.value = '';
+                if (aflystDato.value) {
+                    initAflystState();
+                    aflystDarisContainer.classList.remove('hidden');
+                    renderAflystDaris();
+                    sendAflystData.classList.remove('hidden');
+                }
+            });
+
+            aarsagText.addEventListener('input', () => {
+                if (aflystType === 'med' && aflystDato.value && aarsagText.value.trim() !== '') {
+                    initAflystState();
+                    aflystDarisContainer.classList.remove('hidden');
+                    renderAflystDaris();
+                    sendAflystData.classList.remove('hidden');
+                } else if (aflystType === 'med' && aarsagText.value.trim() === '') {
+                    aflystDarisContainer.classList.add('hidden');
+                    sendAflystData.classList.add('hidden');
+                }
+            });
+
+            aflystPrevBtn.addEventListener('click', () => {
+                if (aflystCurrentIndex > 0) {
+                    aflystCurrentIndex--;
+                    renderAflystDaris();
+                }
+            });
+
+            aflystNextBtn.addEventListener('click', () => {
+                if (aflystCurrentIndex < aflystDarisState.length - 1) {
+                    aflystCurrentIndex++;
+                    renderAflystDaris();
+                } else {
+                    alert('Du har gennemgået alle daris. Klik på "Send data" for at gemme.');
+                }
+            });
+
+            // === KNAPPER MELLEM DELTOG OG AFLYST ===
+            deltogBtn.addEventListener('click', () => {
+                deltogSection.classList.remove('hidden');
+                aflystSection.classList.add('hidden');
+                datoInput.value = '';
+                ugeNrSpan.textContent = '-';
+                sideTalInput.value = '';
+                initDarisState();
+                opdaterDeltogVisning();
+            });
+
+            aflystBtn.addEventListener('click', () => {
+                aflystSection.classList.remove('hidden');
+                deltogSection.classList.add('hidden');
+                aflystDato.value = '';
+                aflystUgeNr.textContent = '-';
+                aflystAarsagButtons.classList.add('hidden');
+                aarsagContainer.classList.add('hidden');
+                aflystDarisContainer.classList.add('hidden');
+                sendAflystData.classList.add('hidden');
+                aflystType = null;
+                aarsagText.value = '';
+            });
+
+            // === SEND DATA ===
+            async function sendToSupabase(data) {
+                try {
+                    const { error } = await supabase
+                        .from('mushrif_daris_log')
+                        .insert([data]);
+                    if (error) throw error;
+                    alert('Data gemt!');
+                } catch (err) {
+                    console.error(err);
+                    alert('Fejl: ' + err.message);
+                }
+            }
+
+            sendDeltogData.addEventListener('click', () => {
+                if (!selectedMushrifId) return alert('Vælg en mushref');
+                if (!datoInput.value) return alert('Vælg dato');
+                if (!sideTalInput.value.trim()) return alert('Udfyld sidetal');
+
+                const dato = datoInput.value;
+                const uge = getWeekNumber(new Date(dato));
+                const sideTal = sideTalInput.value.trim();
+                const darisData = darisState.map(d => ({
+                    navn: d.navn,
+                    halaqa: { status: d.halaqaStatus, reason: d.halaqaReason },
+                    lordag: { status: d.lordagStatus, reason: d.lordagReason }
+                }));
+
+                sendToSupabase({
+                    mushref: selectedMushrifNavn,
+                    dato,
+                    uge,
+                    bog: currentBook,
+                    side_tal: sideTal,
+                    deltog: true,
+                    aflyst_med_aarsag: null,
+                    aflyst_uden_aarsag: null,
+                    daris: darisData,
+                    created_at: new Date().toISOString()
+                });
+            });
+
+            sendAflystData.addEventListener('click', () => {
+                if (!selectedMushrifId) return alert('Vælg en mushref');
+                if (!aflystDato.value) return alert('Vælg dato');
+                if (!aflystType) return alert('Vælg aflyst med/uden årsag');
+                if (aflystType === 'med' && !aarsagText.value.trim()) return alert('Skriv en årsag');
+
+                const dato = aflystDato.value;
+                const uge = getWeekNumber(new Date(dato));
+                const darisData = aflystDarisState.map(d => ({
+                    navn: d.navn,
+                    lordag: { status: d.lordagStatus, reason: d.lordagReason }
+                }));
+
+                sendToSupabase({
+                    mushref: selectedMushrifNavn,
+                    dato,
+                    uge,
+                    bog: null,
+                    side_tal: null,
+                    deltog: false,
+                    aflyst_med_aarsag: aflystType === 'med' ? aarsagText.value.trim() : null,
+                    aflyst_uden_aarsag: aflystType === 'uden',
+                    daris: darisData,
+                    created_at: new Date().toISOString()
+                });
+            });
+
+            // Start
+            loadMushrifs();
+        })();
+    </script>
+</body>
+</html>
