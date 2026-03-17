@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="da">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,14 +15,19 @@
             padding: 0 20px;
             background: #f5f7fa;
         }
-        h1 { color: #1f6feb; }
+
+        h1 {
+            color: #1f6feb;
+        }
+
         .card {
             background: white;
             border-radius: 10px;
             padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             margin-top: 20px;
         }
+
         button {
             background: #1f6feb;
             color: white;
@@ -32,15 +38,24 @@
             font-size: 1rem;
             margin: 5px;
         }
-        button:hover { background: #0f5fd9; }
+
+        button:hover {
+            background: #0f5fd9;
+        }
+
         button.secondary {
             background: #6c757d;
         }
-        button.secondary:hover { background: #5a6268; }
+
+        button.secondary:hover {
+            background: #5a6268;
+        }
+
         button:disabled {
             background: #cccccc;
             cursor: not-allowed;
         }
+
         .btn-group {
             display: flex;
             gap: 10px;
@@ -48,8 +63,12 @@
             margin: 15px 0;
             align-items: center;
         }
-        select, input[type="text"], input[type="date"], textarea {
-            width: 100%;
+
+        select,
+        input[type="text"],
+        input[type="date"],
+        input[type="number"],
+        textarea {
             padding: 8px;
             margin: 8px 0;
             border: 1px solid #ccc;
@@ -57,11 +76,24 @@
             font-size: 1rem;
             box-sizing: border-box;
         }
+
+        select,
+        input[type="text"],
+        input[type="date"],
+        textarea {
+            width: 100%;
+        }
+
+        input[type="number"] {
+            width: 120px;
+        }
+
         label {
             font-weight: 600;
             display: block;
             margin-top: 10px;
         }
+
         .daris-row {
             border: 1px solid #dee2e6;
             border-radius: 8px;
@@ -69,10 +101,12 @@
             margin: 10px 0;
             background: #f8f9fa;
         }
+
         .daris-row h4 {
             margin: 0 0 10px 0;
             color: #1f6feb;
         }
+
         .activity {
             display: flex;
             align-items: center;
@@ -80,24 +114,42 @@
             flex-wrap: wrap;
             margin: 8px 0;
         }
+
         .activity select {
             width: auto;
             flex: 1;
         }
+
+        .minutes-container {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .minutes-container.hidden {
+            display: none;
+        }
+
         .reason-field {
             margin-top: 5px;
         }
-        .hidden { display: none; }
+
+        .hidden {
+            display: none;
+        }
+
         #ugeNr {
             font-weight: bold;
             color: #28a745;
         }
+
         #darisCounter {
             font-weight: bold;
             margin: 0 10px;
         }
     </style>
 </head>
+
 <body>
     <h1>📋 Mushref-Daris registrering</h1>
     <div class="card">
@@ -173,7 +225,7 @@
     </div>
 
     <script>
-        (function() {
+        (function () {
             // === SUPABASE KONFIGURATION ===
             const SUPABASE_URL = 'https://nnqycdwvhgnltzjyycmp.supabase.co';   // din URL
             const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ucXljZHd2aGdubHR6anl5Y21wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzMjU1NjgsImV4cCI6MjA4NjkwMTU2OH0.elueq0ucTlH_7x3rxnTe6zQUAIwFquc_dhN_mPdykKU';   // din anon key
@@ -277,12 +329,13 @@
                 }
             });
 
-            // === DELTOG LOGIK (uændret) ===
+            // === DELTOG LOGIK (med forsinkelse) ===
             function initDarisState() {
                 darisState = darisListe.map(navn => ({
                     navn,
                     halaqaStatus: 'deltog',
                     halaqaReason: '',
+                    halaqaMinutesLate: '', // nyt felt til forsinkelse
                     lordagStatus: 'deltog',
                     lordagReason: ''
                 }));
@@ -306,6 +359,9 @@
                                 <option value="aflystMed" ${d.halaqaStatus === 'aflystMed' ? 'selected' : ''}>Aflyst med årsag</option>
                                 <option value="aflystUden" ${d.halaqaStatus === 'aflystUden' ? 'selected' : ''}>Aflyst uden årsag</option>
                             </select>
+                            <span class="minutes-container ${d.halaqaStatus === 'deltog' ? '' : 'hidden'}" data-idx="${idx}" data-activity="halaqaMinutes">
+                                <input type="number" min="0" step="1" class="minutes-late" data-idx="${idx}" placeholder="min forsinket" value="${d.halaqaMinutesLate}">
+                            </span>
                         </div>
                         <div class="reason-field ${d.halaqaStatus === 'aflystMed' ? '' : 'hidden'}" data-reason="halaqa-${idx}">
                             <input type="text" placeholder="Årsag (halaqa)" value="${d.halaqaReason}">
@@ -328,7 +384,7 @@
                 prevBtn.disabled = currentDarisIndex === 0;
                 nextBtn.textContent = currentDarisIndex === darisState.length - 1 ? 'Færdig' : 'Næste →';
 
-                // Event listeners
+                // Event listeners for selects
                 currentDarisDiv.querySelectorAll('select').forEach(select => {
                     select.addEventListener('change', (e) => {
                         const idx = e.target.dataset.idx;
@@ -339,9 +395,22 @@
                         if (activity === 'halaqa') {
                             darisState[idx].halaqaStatus = value;
                             if (value !== 'aflystMed') darisState[idx].halaqaReason = '';
+
+                            // Håndtering af minut-felt
+                            const minutesContainer = row.querySelector(`.minutes-container[data-idx="${idx}"]`);
+                            if (minutesContainer) {
+                                minutesContainer.classList.toggle('hidden', value !== 'deltog');
+                                if (value !== 'deltog') {
+                                    // Ryd værdi hvis ikke deltog
+                                    const minutesInput = minutesContainer.querySelector('.minutes-late');
+                                    if (minutesInput) minutesInput.value = '';
+                                    darisState[idx].halaqaMinutesLate = '';
+                                }
+                            }
+
                             const reasonDiv = row.querySelector(`[data-reason="halaqa-${idx}"]`);
                             if (reasonDiv) reasonDiv.classList.toggle('hidden', value !== 'aflystMed');
-                        } else {
+                        } else { // lordag
                             darisState[idx].lordagStatus = value;
                             if (value !== 'aflystMed') darisState[idx].lordagReason = '';
                             const reasonDiv = row.querySelector(`[data-reason="lordag-${idx}"]`);
@@ -350,6 +419,7 @@
                     });
                 });
 
+                // Event listeners for årsagsfelter (halaqa og lordag)
                 currentDarisDiv.querySelectorAll('.reason-field input').forEach(input => {
                     input.addEventListener('input', (e) => {
                         const parent = e.target.closest('.reason-field');
@@ -359,6 +429,14 @@
                             if (activity === 'halaqa') darisState[idx].halaqaReason = e.target.value;
                             else if (activity === 'lordag') darisState[idx].lordagReason = e.target.value;
                         }
+                    });
+                });
+
+                // Event listeners for minut-felter
+                currentDarisDiv.querySelectorAll('.minutes-late').forEach(input => {
+                    input.addEventListener('input', (e) => {
+                        const idx = e.target.dataset.idx;
+                        darisState[idx].halaqaMinutesLate = e.target.value;
                     });
                 });
             }
@@ -415,7 +493,7 @@
                 }
             });
 
-            // === AFLYST LOGIK (ændret) ===
+            // === AFLYST LOGIK (uændret) ===
             function initAflystState() {
                 aflystDarisState = darisListe.map(navn => ({
                     navn,
@@ -567,7 +645,7 @@
                 aarsagText.value = '';
             });
 
-            // === SEND DATA ===
+            // === SEND DATA (opdateret med separat kolonne) ===
             async function sendToSupabase(data) {
                 try {
                     const { error } = await supabase
@@ -589,12 +667,23 @@
                 const dato = datoInput.value;
                 const uge = getWeekNumber(new Date(dato));
                 const sideTal = sideTalInput.value.trim();
+
+                // Byg JSON til daris (samme som før)
                 const darisData = darisState.map(d => ({
                     navn: d.navn,
-                    halaqa: { status: d.halaqaStatus, reason: d.halaqaReason },
+                    halaqa: {
+                        status: d.halaqaStatus,
+                        reason: d.halaqaReason
+                    },
                     lordag: { status: d.lordagStatus, reason: d.lordagReason }
                 }));
 
+                // Byg array af forsinkelser (i samme rækkefølge)
+                const minutesLateArray = darisState.map(d =>
+                    d.halaqaMinutesLate ? parseInt(d.halaqaMinutesLate) : null
+                );
+
+                // Send data med både daris (JSON) og halaqa_minutes_late (array)
                 sendToSupabase({
                     mushref: selectedMushrifNavn,
                     dato,
@@ -605,6 +694,7 @@
                     aflyst_med_aarsag: null,
                     aflyst_uden_aarsag: null,
                     daris: darisData,
+                    halaqa_minutes_late: minutesLateArray, // ny kolonne
                     created_at: new Date().toISOString()
                 });
             });
@@ -617,11 +707,13 @@
 
                 const dato = aflystDato.value;
                 const uge = getWeekNumber(new Date(dato));
+
                 const darisData = aflystDarisState.map(d => ({
                     navn: d.navn,
                     lordag: { status: d.lordagStatus, reason: d.lordagReason }
                 }));
 
+                // Ingen halaqa-forsinkelser ved aflyst
                 sendToSupabase({
                     mushref: selectedMushrifNavn,
                     dato,
@@ -632,6 +724,7 @@
                     aflyst_med_aarsag: aflystType === 'med' ? aarsagText.value.trim() : null,
                     aflyst_uden_aarsag: aflystType === 'uden',
                     daris: darisData,
+                    halaqa_minutes_late: null, // eller tomt array [] hvis du foretrækker
                     created_at: new Date().toISOString()
                 });
             });
@@ -641,4 +734,5 @@
         })();
     </script>
 </body>
+
 </html>
