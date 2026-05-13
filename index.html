@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mushref-Daris registrering</title>
+    <title>Mushref-Daris registrering - Flere bøger</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         /* (samme styles som tidligere) */
@@ -135,7 +135,7 @@
         }
 
         .hidden {
-            display: none;
+            display: none !important;
         }
 
         #ugeNr {
@@ -158,6 +158,14 @@
             <option value="">-- Vælg --</option>
         </select>
 
+        <!-- Ny dropdown til bøger -->
+        <div id="bookSelectContainer" class="hidden">
+            <label for="bookSelect">Vælg bog:</label>
+            <select id="bookSelect">
+                <option value="">-- Vælg bog --</option>
+            </select>
+        </div>
+
         <div id="mainOptions" class="btn-group hidden">
             <button id="deltogBtn" class="primary">✅ Jeg deltog</button>
             <button id="aflystBtn" class="secondary">❌ Halaqa aflyst</button>
@@ -169,11 +177,6 @@
             <label for="dato">Dato:</label>
             <input type="date" id="dato">
             <p>Uge nummer: <span id="ugeNr">-</span></p>
-
-            <div id="bookInfo" class="hidden">
-                <label>Bog:</label>
-                <p id="bookName"></p>
-            </div>
 
             <div id="sideTalContainer" class="hidden">
                 <label for="sideTal">Sidetal (f.eks. 10):</label>
@@ -233,6 +236,8 @@
 
             // DOM elementer
             const mushrifSelect = document.getElementById('mushrifSelect');
+            const bookSelectContainer = document.getElementById('bookSelectContainer');
+            const bookSelect = document.getElementById('bookSelect');
             const mainOptions = document.getElementById('mainOptions');
             const deltogBtn = document.getElementById('deltogBtn');
             const aflystBtn = document.getElementById('aflystBtn');
@@ -242,8 +247,6 @@
             // Deltog elementer
             const datoInput = document.getElementById('dato');
             const ugeNrSpan = document.getElementById('ugeNr');
-            const bookInfo = document.getElementById('bookInfo');
-            const bookName = document.getElementById('bookName');
             const sideTalContainer = document.getElementById('sideTalContainer');
             const sideTalInput = document.getElementById('sideTal');
             const darisContainer = document.getElementById('darisContainer');
@@ -271,7 +274,9 @@
             // State
             let selectedMushrifId = null;
             let selectedMushrifNavn = null;
-            let currentBook = '';
+            let currentBooks = [];             // array af {bog, daris_liste}
+            let selectedBookIndex = null;      // index i currentBooks
+            let currentBook = '';               // originalt bognavn (med eventuelt nummer)
             let darisListe = [];
             let darisState = [];
             let currentDarisIndex = 0;
@@ -279,7 +284,21 @@
             let aflystCurrentIndex = 0;
             let aflystType = null; // 'med' eller 'uden'
 
-            // === HJÆLPEFUNKTIONER ===
+            // Forkort bog (samme mapping som admin-systemet)
+            function forkortBog(bog) {
+                const mapping = {
+                    'Nidham al-Islam (Islams system)': 'Nidham',
+                    'Min Muqawwimat An-Nafsiyya Allslamiyya (Bestanddele af den Islamiske Psyke)': 'Islamiske Psyke',
+                    'Al-Takattul al-Hizbi (Den partimæssige sammenslutning)': 'Takattul',
+                    'Mafahim Hizb ut-Tahrir (Hizb ut-Tahrirs opfattelser)': 'Mafahim HT',
+                    'Mafahim siyasiyah (Hizb ut Tahrirs Politiske Opfattelser)': 'Mafahim siyasiyah',
+                    'Ad-Dawlah Al-Islamiyah (Den Islamiske Stat)': 'Dawlah',
+                    'Ajhizat dawlat Al-Khilafah fil-hukm wal-idarah (Kalifatets Statsinstitutioner (Styre & Forvaltning))': 'Dawlah hukm idarah',
+                    'Nidtham alajtimaeiu (Social systemet)': 'Social systemet'
+                };
+                return mapping[bog] || bog;
+            }
+
             function getWeekNumber(date) {
                 const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
                 const dayNum = d.getUTCDay() || 7;
@@ -288,12 +307,12 @@
                 return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
             }
 
-            // Hent mushrifs fra databasen
+            // Hent mushrifs med bøger (books JSONB)
             async function loadMushrifs() {
                 try {
                     const { data, error } = await supabase
                         .from('mushrif_relations')
-                        .select('id, mushrif_navn, bog, daris_liste')
+                        .select('id, mushrif_navn, books')
                         .order('mushrif_navn');
                     if (error) throw error;
 
@@ -302,8 +321,7 @@
                         const option = document.createElement('option');
                         option.value = m.id;
                         option.textContent = m.mushrif_navn;
-                        option.dataset.bog = m.bog;
-                        option.dataset.daris = JSON.stringify(m.daris_liste || []);
+                        option.dataset.books = JSON.stringify(m.books || []);
                         mushrifSelect.appendChild(option);
                     });
                 } catch (err) {
@@ -312,30 +330,72 @@
                 }
             }
 
-            // Når mushref vælges
+            // Når mushref vælges, opdater bog-dropdown
             mushrifSelect.addEventListener('change', (e) => {
                 const option = e.target.selectedOptions[0];
                 if (option && option.value) {
                     selectedMushrifId = option.value;
                     selectedMushrifNavn = option.textContent;
-                    currentBook = option.dataset.bog || 'Ingen bog valgt';
-                    darisListe = JSON.parse(option.dataset.daris || '[]');
-                    mainOptions.classList.remove('hidden');
+                    currentBooks = JSON.parse(option.dataset.books || '[]');
+
+                    if (currentBooks.length === 0) {
+                        alert('Denne mushref har ingen bøger endnu. Tilføj bøger i administrationssystemet.');
+                        bookSelectContainer.classList.add('hidden');
+                        mainOptions.classList.add('hidden');
+                        deltogSection.classList.add('hidden');
+                        aflystSection.classList.add('hidden');
+                        selectedBookIndex = null;
+                        return;
+                    }
+
+                    // Udfyld bog-dropdown med forkortede navne (men gem originalt navn som value)
+                    bookSelect.innerHTML = '<option value="">-- Vælg bog --</option>';
+                    currentBooks.forEach((book, idx) => {
+                        const opt = document.createElement('option');
+                        opt.value = idx;  // index som value
+                        opt.textContent = forkortBog(book.bog);
+                        bookSelect.appendChild(opt);
+                    });
+                    bookSelectContainer.classList.remove('hidden');
+                    mainOptions.classList.add('hidden');
                     deltogSection.classList.add('hidden');
                     aflystSection.classList.add('hidden');
+                    selectedBookIndex = null;
                 } else {
                     selectedMushrifId = null;
+                    bookSelectContainer.classList.add('hidden');
                     mainOptions.classList.add('hidden');
+                    deltogSection.classList.add('hidden');
+                    aflystSection.classList.add('hidden');
                 }
             });
 
-            // === DELTOG LOGIK (med forsinkelse) ===
+            // Når der vælges en bog
+            bookSelect.addEventListener('change', (e) => {
+                const idx = e.target.value;
+                if (idx === "") {
+                    selectedBookIndex = null;
+                    mainOptions.classList.add('hidden');
+                    deltogSection.classList.add('hidden');
+                    aflystSection.classList.add('hidden');
+                    return;
+                }
+                selectedBookIndex = parseInt(idx);
+                const selectedBook = currentBooks[selectedBookIndex];
+                currentBook = selectedBook.bog;          // originalt bognavn (med evt. nummer)
+                darisListe = selectedBook.daris_liste || [];
+                mainOptions.classList.remove('hidden');
+                deltogSection.classList.add('hidden');
+                aflystSection.classList.add('hidden');
+            });
+
+            // === DELTOG LOGIK ===
             function initDarisState() {
                 darisState = darisListe.map(navn => ({
                     navn,
                     halaqaStatus: 'deltog',
                     halaqaReason: '',
-                    halaqaMinutesLate: '', // nyt felt til forsinkelse
+                    halaqaMinutesLate: '',
                     lordagStatus: 'deltog',
                     lordagReason: ''
                 }));
@@ -351,7 +411,7 @@
                 const idx = currentDarisIndex;
                 const html = `
                     <div class="daris-row">
-                        <h4>${d.navn}</h4>
+                        <h4>${escapeHtml(d.navn)}</h4>
                         <div class="activity">
                             <span><strong>Halaqa:</strong></span>
                             <select data-idx="${idx}" data-activity="halaqa">
@@ -364,7 +424,7 @@
                             </span>
                         </div>
                         <div class="reason-field ${d.halaqaStatus === 'aflystMed' ? '' : 'hidden'}" data-reason="halaqa-${idx}">
-                            <input type="text" placeholder="Årsag (halaqa)" value="${d.halaqaReason}">
+                            <input type="text" placeholder="Årsag (halaqa)" value="${escapeHtml(d.halaqaReason)}">
                         </div>
                         <div class="activity">
                             <span><strong>Lørdagsmøde:</strong></span>
@@ -375,7 +435,7 @@
                             </select>
                         </div>
                         <div class="reason-field ${d.lordagStatus === 'aflystMed' ? '' : 'hidden'}" data-reason="lordag-${idx}">
-                            <input type="text" placeholder="Årsag (lørdag)" value="${d.lordagReason}">
+                            <input type="text" placeholder="Årsag (lørdag)" value="${escapeHtml(d.lordagReason)}">
                         </div>
                     </div>
                 `;
@@ -384,7 +444,7 @@
                 prevBtn.disabled = currentDarisIndex === 0;
                 nextBtn.textContent = currentDarisIndex === darisState.length - 1 ? 'Færdig' : 'Næste →';
 
-                // Event listeners for selects
+                // Event listeners
                 currentDarisDiv.querySelectorAll('select').forEach(select => {
                     select.addEventListener('change', (e) => {
                         const idx = e.target.dataset.idx;
@@ -395,19 +455,15 @@
                         if (activity === 'halaqa') {
                             darisState[idx].halaqaStatus = value;
                             if (value !== 'aflystMed') darisState[idx].halaqaReason = '';
-
-                            // Håndtering af minut-felt
                             const minutesContainer = row.querySelector(`.minutes-container[data-idx="${idx}"]`);
                             if (minutesContainer) {
                                 minutesContainer.classList.toggle('hidden', value !== 'deltog');
                                 if (value !== 'deltog') {
-                                    // Ryd værdi hvis ikke deltog
                                     const minutesInput = minutesContainer.querySelector('.minutes-late');
                                     if (minutesInput) minutesInput.value = '';
                                     darisState[idx].halaqaMinutesLate = '';
                                 }
                             }
-
                             const reasonDiv = row.querySelector(`[data-reason="halaqa-${idx}"]`);
                             if (reasonDiv) reasonDiv.classList.toggle('hidden', value !== 'aflystMed');
                         } else { // lordag
@@ -419,7 +475,6 @@
                     });
                 });
 
-                // Event listeners for årsagsfelter (halaqa og lordag)
                 currentDarisDiv.querySelectorAll('.reason-field input').forEach(input => {
                     input.addEventListener('input', (e) => {
                         const parent = e.target.closest('.reason-field');
@@ -432,7 +487,6 @@
                     });
                 });
 
-                // Event listeners for minut-felter
                 currentDarisDiv.querySelectorAll('.minutes-late').forEach(input => {
                     input.addEventListener('input', (e) => {
                         const idx = e.target.dataset.idx;
@@ -444,11 +498,8 @@
             function opdaterDeltogVisning() {
                 const harDato = datoInput.value.trim() !== '';
                 if (harDato) {
-                    bookInfo.classList.remove('hidden');
-                    bookName.textContent = currentBook;
                     sideTalContainer.classList.remove('hidden');
                 } else {
-                    bookInfo.classList.add('hidden');
                     sideTalContainer.classList.add('hidden');
                     darisContainer.classList.add('hidden');
                     sendDeltogData.classList.add('hidden');
@@ -493,7 +544,7 @@
                 }
             });
 
-            // === AFLYST LOGIK (uændret) ===
+            // === AFLYST LOGIK ===
             function initAflystState() {
                 aflystDarisState = darisListe.map(navn => ({
                     navn,
@@ -512,7 +563,7 @@
                 const idx = aflystCurrentIndex;
                 const html = `
                     <div class="daris-row">
-                        <h4>${d.navn}</h4>
+                        <h4>${escapeHtml(d.navn)}</h4>
                         <div class="activity">
                             <span><strong>Lørdagsmøde:</strong></span>
                             <select data-idx="${idx}" data-activity="lordag">
@@ -522,7 +573,7 @@
                             </select>
                         </div>
                         <div class="reason-field ${d.lordagStatus === 'aflystMed' ? '' : 'hidden'}" data-reason="lordag-${idx}">
-                            <input type="text" placeholder="Årsag (lørdag)" value="${d.lordagReason}">
+                            <input type="text" placeholder="Årsag (lørdag)" value="${escapeHtml(d.lordagReason)}">
                         </div>
                     </div>
                 `;
@@ -645,7 +696,7 @@
                 aarsagText.value = '';
             });
 
-            // === SEND DATA (opdateret med separat kolonne) ===
+            // === SEND DATA ===
             async function sendToSupabase(data) {
                 try {
                     const { error } = await supabase
@@ -660,7 +711,7 @@
             }
 
             sendDeltogData.addEventListener('click', () => {
-                if (!selectedMushrifId) return alert('Vælg en mushref');
+                if (!selectedMushrifId || selectedBookIndex === null) return alert('Vælg mushref og bog');
                 if (!datoInput.value) return alert('Vælg dato');
                 if (!sideTalInput.value.trim()) return alert('Udfyld sidetal');
 
@@ -668,22 +719,16 @@
                 const uge = getWeekNumber(new Date(dato));
                 const sideTal = sideTalInput.value.trim();
 
-                // Byg JSON til daris (samme som før)
                 const darisData = darisState.map(d => ({
                     navn: d.navn,
-                    halaqa: {
-                        status: d.halaqaStatus,
-                        reason: d.halaqaReason
-                    },
+                    halaqa: { status: d.halaqaStatus, reason: d.halaqaReason },
                     lordag: { status: d.lordagStatus, reason: d.lordagReason }
                 }));
 
-                // Byg array af forsinkelser (i samme rækkefølge)
                 const minutesLateArray = darisState.map(d =>
                     d.halaqaMinutesLate ? parseInt(d.halaqaMinutesLate) : null
                 );
 
-                // Send data med både daris (JSON) og halaqa_minutes_late (array)
                 sendToSupabase({
                     mushref: selectedMushrifNavn,
                     dato,
@@ -694,13 +739,13 @@
                     aflyst_med_aarsag: null,
                     aflyst_uden_aarsag: null,
                     daris: darisData,
-                    halaqa_minutes_late: minutesLateArray, // ny kolonne
+                    halaqa_minutes_late: minutesLateArray,
                     created_at: new Date().toISOString()
                 });
             });
 
             sendAflystData.addEventListener('click', () => {
-                if (!selectedMushrifId) return alert('Vælg en mushref');
+                if (!selectedMushrifId || selectedBookIndex === null) return alert('Vælg mushref og bog');
                 if (!aflystDato.value) return alert('Vælg dato');
                 if (!aflystType) return alert('Vælg aflyst med/uden årsag');
                 if (aflystType === 'med' && !aarsagText.value.trim()) return alert('Skriv en årsag');
@@ -713,21 +758,30 @@
                     lordag: { status: d.lordagStatus, reason: d.lordagReason }
                 }));
 
-                // Ingen halaqa-forsinkelser ved aflyst
                 sendToSupabase({
                     mushref: selectedMushrifNavn,
                     dato,
                     uge,
-                    bog: null,
+                    bog: currentBook,
                     side_tal: null,
                     deltog: false,
                     aflyst_med_aarsag: aflystType === 'med' ? aarsagText.value.trim() : null,
                     aflyst_uden_aarsag: aflystType === 'uden',
                     daris: darisData,
-                    halaqa_minutes_late: null, // eller tomt array [] hvis du foretrækker
+                    halaqa_minutes_late: null,
                     created_at: new Date().toISOString()
                 });
             });
+
+            function escapeHtml(str) {
+                if (!str) return '';
+                return String(str).replace(/[&<>]/g, function (m) {
+                    if (m === '&') return '&amp;';
+                    if (m === '<') return '&lt;';
+                    if (m === '>') return '&gt;';
+                    return m;
+                });
+            }
 
             // Start
             loadMushrifs();
