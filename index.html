@@ -3,28 +3,34 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Mushref-Daris registrering - Halaqa / Lørdagsmøde</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Segoe UI', Arial, sans-serif;
             max-width: 900px;
-            margin: 2rem auto;
-            padding: 0 20px;
+            margin: 1rem auto;
+            padding: 0 16px;
             background: #f5f7fa;
         }
 
         h1 {
             color: #1f6feb;
+            font-size: 1.6rem;
+            text-align: center;
         }
 
         .card {
             background: white;
             border-radius: 10px;
-            padding: 20px;
+            padding: 16px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            margin-top: 20px;
+            margin-top: 16px;
         }
 
         button {
@@ -53,6 +59,11 @@
         button:disabled {
             background: #cccccc;
             cursor: not-allowed;
+        }
+
+        button.active {
+            background: #0a3d8a !important;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.2);
         }
 
         .btn-group {
@@ -137,28 +148,49 @@
             display: none !important;
         }
 
-        #ugeNr,
-        #lordagUgeNr {
+        #halaqaUgeNr,
+        #lordagUgeNr,
+        #halaqaAfbudUgeNr {
             font-weight: bold;
             color: #28a745;
         }
 
-        #darisCounter,
-        #lordagDarisCounter {
-            font-weight: bold;
-            margin: 0 10px;
-        }
-
         .mode-buttons {
             display: flex;
+            flex-wrap: wrap;
             justify-content: center;
-            gap: 20px;
+            gap: 15px;
             margin-bottom: 20px;
         }
 
         .mode-buttons button {
             font-size: 1.2rem;
-            padding: 12px 30px;
+            padding: 12px 24px;
+            flex: 0 1 auto;
+            max-width: 100%;
+        }
+
+        .date-field {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 8px 0;
+        }
+
+        .date-field input {
+            flex: 1;
+            margin: 0;
+        }
+
+        @media (max-width: 600px) {
+            .mode-buttons button {
+                font-size: 1rem;
+                padding: 10px 16px;
+            }
+
+            .btn-group {
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -166,19 +198,16 @@
 <body>
     <h1>📋 Mushref-Daris registrering</h1>
     <div class="card">
-        <!-- Valg af modul (Halaqa / Lørdagsmøde) -->
         <div id="modeSelection" class="mode-buttons">
             <button id="halaqaModeBtn">📖 Halaqa</button>
             <button id="lordagModeBtn">📅 Lørdagsmøde</button>
         </div>
 
-        <!-- Fælles sektion for valg af mushrif og bog (vises efter modulvalg) -->
         <div id="mushrifBookSection" class="hidden">
             <label for="mushrifSelect">Vælg Mushref:</label>
             <select id="mushrifSelect">
                 <option value="">-- Vælg --</option>
             </select>
-
             <div id="bookSelectContainer" class="hidden">
                 <label for="bookSelect">Vælg bog:</label>
                 <select id="bookSelect">
@@ -187,24 +216,22 @@
             </div>
         </div>
 
-        <!-- Halaqa-modul: valg mellem "Jeg deltog" og "Halaqa aflyst" -->
+        <!-- Halaqa-modul -->
         <div id="halaqaMainOptions" class="btn-group hidden">
             <button id="deltogBtn" class="primary">✅ Jeg deltog i Halaqa</button>
-            <button id="halaqaAflystBtn" class="secondary">❌ Halaqa aflyst</button>
+            <button id="halaqaAfbudBtn" class="secondary">❌ Halaqa aflyst</button>
         </div>
-
-        <!-- Halaqa: Deltog-sektion (uden lørdagsmøde) -->
         <div id="halaqaDeltogSection" class="hidden">
             <hr>
-            <label for="halaqaDato">Dato:</label>
-            <input type="date" id="halaqaDato">
-            <p>Uge nummer: <span id="halaqaUgeNr">-</span></p>
-
-            <div id="halaqaSideTalContainer" class="hidden">
-                <label for="halaqaSideTal">Sidetal:</label>
-                <input type="text" id="halaqaSideTal" placeholder="f.eks. 10">
+            <div class="date-field">
+                <label for="halaqaDato" style="flex:0 0 80px;">Dato:</label>
+                <input type="date" id="halaqaDato">
             </div>
-
+            <p>Uge nummer: <span id="halaqaUgeNr">-</span></p>
+            <div id="halaqaSideTalContainer" class="hidden">
+                <label for="halaqaSideTal">Sidetal:</label><input type="text" id="halaqaSideTal"
+                    placeholder="f.eks. 10">
+            </div>
             <div id="halaqaDarisContainer" class="hidden">
                 <h3>Daris oversigt (kun Halaqa)</h3>
                 <div id="halaqaCurrentDaris"></div>
@@ -214,37 +241,40 @@
                     <button id="halaqaNextDaris" class="secondary">Næste →</button>
                 </div>
             </div>
-
-            <button id="sendHalaqaDeltogData" class="primary hidden">📤 Send Halaqa-data</button>
+            <div class="btn-group">
+                <button id="sendHalaqaDeltogData" class="primary hidden">📤 Send Halaqa-data</button>
+                <button id="fortrydHalaqaBtn" class="secondary hidden">↩️ Fortryd</button>
+            </div>
         </div>
-
-        <!-- Halaqa: Aflyst-sektion (simpel, ingen daris) -->
-        <div id="halaqaAflystSection" class="hidden">
+        <div id="halaqaAfbudSection" class="hidden">
             <hr>
-            <label for="halaqaAflystDato">Dato:</label>
-            <input type="date" id="halaqaAflystDato">
-            <p>Uge nummer: <span id="halaqaAflystUgeNr">-</span></p>
-
-            <div id="halaqaAflystAarsagButtons" class="btn-group hidden">
-                <button id="halaqaAflystMedAarsag" class="secondary">Aflyst med årsag</button>
-                <button id="halaqaAflystUdenAarsag" class="secondary">Aflyst uden årsag</button>
+            <div class="date-field">
+                <label for="halaqaAfbudDato" style="flex:0 0 80px;">Dato:</label>
+                <input type="date" id="halaqaAfbudDato">
             </div>
-
-            <div id="halaqaAarsagContainer" class="hidden">
-                <label for="halaqaAarsagText">Årsag:</label>
-                <textarea id="halaqaAarsagText" rows="3" placeholder="Skriv årsag..."></textarea>
+            <p>Uge nummer: <span id="halaqaAfbudUgeNr">-</span></p>
+            <div id="halaqaAfbudAarsagButtons" class="btn-group hidden">
+                <button id="halaqaAfbudMedAarsag" class="secondary">Afbud med årsag</button>
+                <button id="halaqaAfbudUdenAarsag" class="secondary">Afbud uden årsag</button>
             </div>
-
-            <button id="sendHalaqaAflystData" class="primary hidden">📤 Send aflysningsdata</button>
+            <div id="halaqaAfbudAarsagContainer" class="hidden">
+                <label for="halaqaAfbudAarsagText">Årsag:</label><textarea id="halaqaAfbudAarsagText" rows="3"
+                    placeholder="Skriv årsag..."></textarea>
+            </div>
+            <div class="btn-group">
+                <button id="sendHalaqaAfbudData" class="primary hidden">📤 Send aflysningsdata</button>
+                <button id="fortrydHalaqaAfbudBtn" class="secondary hidden">↩️ Fortryd</button>
+            </div>
         </div>
 
         <!-- Lørdagsmøde-modul -->
         <div id="lordagSection" class="hidden">
             <hr>
-            <label for="lordagDato">Dato:</label>
-            <input type="date" id="lordagDato">
+            <div class="date-field">
+                <label for="lordagDato" style="flex:0 0 80px;">Dato:</label>
+                <input type="date" id="lordagDato">
+            </div>
             <p>Uge nummer: <span id="lordagUgeNr">-</span></p>
-
             <div id="lordagDarisContainer" class="hidden">
                 <h3>Registrér lørdagsmøde for daris</h3>
                 <div id="lordagCurrentDaris"></div>
@@ -254,20 +284,20 @@
                     <button id="lordagNextDaris" class="secondary">Næste →</button>
                 </div>
             </div>
-
-            <button id="sendLordagData" class="primary hidden">📤 Send Lørdagsmøde-data</button>
+            <div class="btn-group">
+                <button id="sendLordagData" class="primary hidden">📤 Send Lørdagsmøde-data</button>
+                <button id="fortrydLordagBtn" class="secondary hidden">↩️ Fortryd</button>
+            </div>
         </div>
     </div>
 
     <script>
         (function () {
-            // === SUPABASE KONFIGURATION ===
-            const SUPABASE_URL = 'https://nnqycdwvhgnltzjyycmp.supabase.co';   // din URL
-            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ucXljZHd2aGdubHR6anl5Y21wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzMjU1NjgsImV4cCI6MjA4NjkwMTU2OH0.elueq0ucTlH_7x3rxnTe6zQUAIwFquc_dhN_mPdykKU';   // din anon key
+            const SUPABASE_URL = 'https://nnqycdwvhgnltzjyycmp.supabase.co';   // erstat med din URL
+            const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ucXljZHd2aGdubHR6anl5Y21wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzMjU1NjgsImV4cCI6MjA4NjkwMTU2OH0.elueq0ucTlH_7x3rxnTe6zQUAIwFquc_dhN_mPdykKU';   // erstat med din anon key
             const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-            // DOM elementer - fælles
-            const modeSelection = document.getElementById('modeSelection');
+            // DOM elementer
             const halaqaModeBtn = document.getElementById('halaqaModeBtn');
             const lordagModeBtn = document.getElementById('lordagModeBtn');
             const mushrifBookSection = document.getElementById('mushrifBookSection');
@@ -275,14 +305,12 @@
             const bookSelectContainer = document.getElementById('bookSelectContainer');
             const bookSelect = document.getElementById('bookSelect');
 
-            // Halaqa-del
             const halaqaMainOptions = document.getElementById('halaqaMainOptions');
             const deltogBtn = document.getElementById('deltogBtn');
-            const halaqaAflystBtn = document.getElementById('halaqaAflystBtn');
+            const halaqaAfbudBtn = document.getElementById('halaqaAfbudBtn');
             const halaqaDeltogSection = document.getElementById('halaqaDeltogSection');
-            const halaqaAflystSection = document.getElementById('halaqaAflystSection');
+            const halaqaAfbudSection = document.getElementById('halaqaAfbudSection');
 
-            // Halaqa - deltog elementer
             const halaqaDato = document.getElementById('halaqaDato');
             const halaqaUgeNr = document.getElementById('halaqaUgeNr');
             const halaqaSideTalContainer = document.getElementById('halaqaSideTalContainer');
@@ -293,18 +321,18 @@
             const halaqaNextBtn = document.getElementById('halaqaNextDaris');
             const halaqaDarisCounterSpan = document.getElementById('halaqaDarisCounter');
             const sendHalaqaDeltogData = document.getElementById('sendHalaqaDeltogData');
+            const fortrydHalaqaBtn = document.getElementById('fortrydHalaqaBtn');
 
-            // Halaqa - aflyst elementer
-            const halaqaAflystDato = document.getElementById('halaqaAflystDato');
-            const halaqaAflystUgeNr = document.getElementById('halaqaAflystUgeNr');
-            const halaqaAflystAarsagButtons = document.getElementById('halaqaAflystAarsagButtons');
-            const halaqaAflystMedAarsag = document.getElementById('halaqaAflystMedAarsag');
-            const halaqaAflystUdenAarsag = document.getElementById('halaqaAflystUdenAarsag');
-            const halaqaAarsagContainer = document.getElementById('halaqaAarsagContainer');
-            const halaqaAarsagText = document.getElementById('halaqaAarsagText');
-            const sendHalaqaAflystData = document.getElementById('sendHalaqaAflystData');
+            const halaqaAfbudDato = document.getElementById('halaqaAfbudDato');
+            const halaqaAfbudUgeNr = document.getElementById('halaqaAfbudUgeNr');
+            const halaqaAfbudAarsagButtons = document.getElementById('halaqaAfbudAarsagButtons');
+            const halaqaAfbudMedAarsag = document.getElementById('halaqaAfbudMedAarsag');
+            const halaqaAfbudUdenAarsag = document.getElementById('halaqaAfbudUdenAarsag');
+            const halaqaAfbudAarsagContainer = document.getElementById('halaqaAfbudAarsagContainer');
+            const halaqaAfbudAarsagText = document.getElementById('halaqaAfbudAarsagText');
+            const sendHalaqaAfbudData = document.getElementById('sendHalaqaAfbudData');
+            const fortrydHalaqaAfbudBtn = document.getElementById('fortrydHalaqaAfbudBtn');
 
-            // Lørdagsmøde elementer
             const lordagSection = document.getElementById('lordagSection');
             const lordagDato = document.getElementById('lordagDato');
             const lordagUgeNr = document.getElementById('lordagUgeNr');
@@ -314,9 +342,10 @@
             const lordagNextBtn = document.getElementById('lordagNextDaris');
             const lordagDarisCounterSpan = document.getElementById('lordagDarisCounter');
             const sendLordagData = document.getElementById('sendLordagData');
+            const fortrydLordagBtn = document.getElementById('fortrydLordagBtn');
 
             // State
-            let currentMode = null; // 'halaqa' eller 'lordag'
+            let currentMode = null;
             let selectedMushrifId = null;
             let selectedMushrifNavn = null;
             let currentBooks = [];
@@ -324,18 +353,75 @@
             let currentBook = '';
             let darisListe = [];
 
-            // Halaqa-deltog state (kun halaqa)
-            let halaqaDarisState = [];   // hver: { navn, halaqaStatus, halaqaReason, halaqaMinutesLate }
+            let halaqaDarisState = [];
             let halaqaCurrentIndex = 0;
+            let halaqaAfbudType = null;
 
-            // Halaqa-aflyst state
-            let halaqaAflystType = null; // 'med' eller 'uden'
-
-            // Lørdagsmøde state
-            let lordagDarisState = [];    // hver: { navn, lordagStatus, lordagReason }
+            let lordagDarisState = [];
             let lordagCurrentIndex = 0;
 
-            // Hjælpefunktioner
+            let lastInsertedId = null;
+            let lastInsertedTable = null;
+
+            // Dato hjælpefunktioner (konverter ISO til dansk visning)
+            function formatDanishDate(date) {
+                if (!date) return '';
+                const d = new Date(date);
+                const day = d.getDate().toString().padStart(2, '0');
+                const month = (d.getMonth() + 1).toString().padStart(2, '0');
+                const year = d.getFullYear();
+                return `${day}-${month}-${year}`;
+            }
+
+            function parseDanishDate(dateStr) {
+                if (!dateStr) return null;
+                const parts = dateStr.split('-');
+                if (parts.length !== 3) return null;
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                const year = parseInt(parts[2], 10);
+                if (isNaN(day) || isNaN(month + 1) || isNaN(year)) return null;
+                return new Date(year, month, day);
+            }
+
+            function getWeekNumber(date) {
+                const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+                const dayNum = d.getUTCDay() || 7;
+                d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+                const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+                return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            }
+
+            // Omdan dato fra input (ISO yyyy-mm-dd) til dansk tekst og opdater ugenummer
+            function setupDateInput(inputElement, weekSpan, callback) {
+                inputElement.addEventListener('change', () => {
+                    if (inputElement.value) {
+                        const date = new Date(inputElement.value);
+                        if (!isNaN(date.getTime())) {
+                            const week = getWeekNumber(date);
+                            weekSpan.textContent = week;
+                        } else {
+                            weekSpan.textContent = '-';
+                        }
+                    } else {
+                        weekSpan.textContent = '-';
+                    }
+                    if (callback) callback();
+                });
+                // Hvis der er en eksisterende værdi (ved redigering), kør med det samme
+                if (inputElement.value) {
+                    const date = new Date(inputElement.value);
+                    if (!isNaN(date.getTime())) {
+                        weekSpan.textContent = getWeekNumber(date);
+                    }
+                }
+            }
+
+            setupDateInput(halaqaDato, halaqaUgeNr, () => opdaterHalaqaDeltogVisning());
+            setupDateInput(halaqaAfbudDato, halaqaAfbudUgeNr, null);
+            setupDateInput(lordagDato, lordagUgeNr, () => opdaterLordagVisning());
+
+            // Bog-forkortelse
             function forkortBog(bog) {
                 const mapping = {
                     'Nidham al-Islam (Islams system)': 'Nidham',
@@ -350,89 +436,100 @@
                 return mapping[bog] || bog;
             }
 
-            function getWeekNumber(date) {
-                const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-                const dayNum = d.getUTCDay() || 7;
-                d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-                const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-                return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-            }
-
             function escapeHtml(str) {
                 if (!str) return '';
-                return String(str).replace(/[&<>]/g, function (m) {
-                    if (m === '&') return '&amp;';
-                    if (m === '<') return '&lt;';
-                    if (m === '>') return '&gt;';
-                    return m;
-                });
+                return String(str).replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
             }
 
-            // Hent mushrifs
             async function loadMushrifs() {
                 try {
                     const { data, error } = await supabase
-                        .from('mushrif_relations')
-                        .select('id, mushrif_navn, books')
-                        .order('mushrif_navn');
+                        .from('personer')
+                        .select('id, navn, books_taught, roles')
+                        .eq('is_active', true)
+                        .order('navn');
                     if (error) throw error;
-
+                    const mushrifs = (data || []).filter(p => p.roles && Array.isArray(p.roles) && p.roles.includes('mushrif'));
                     mushrifSelect.innerHTML = '<option value="">-- Vælg --</option>';
-                    data.forEach(m => {
+                    if (mushrifs.length === 0) {
+                        mushrifSelect.innerHTML = '<option value="">-- Ingen aktive mushrifs --</option>';
+                        return;
+                    }
+                    mushrifs.forEach(p => {
                         const option = document.createElement('option');
-                        option.value = m.id;
-                        option.textContent = m.mushrif_navn;
-                        option.dataset.books = JSON.stringify(m.books || []);
+                        option.value = p.id;
+                        option.textContent = p.navn;
+                        const books = Array.isArray(p.books_taught) ? p.books_taught : [];
+                        option.dataset.books = JSON.stringify(books);
                         mushrifSelect.appendChild(option);
                     });
                 } catch (err) {
                     console.error('Fejl ved hentning af mushrifs:', err);
-                    alert('Kunne ikke hente mushrifs. Tjek konsol.');
+                    alert('Kunne ikke hente aktive mushrifs: ' + err.message);
                 }
             }
 
-            // Når mushrif vælges
+            function handleBookSelectionAfterMushrif() {
+                if (currentBooks.length === 0) {
+                    alert('Denne mushref har ingen bøger endnu.');
+                    bookSelectContainer.classList.add('hidden');
+                    return;
+                }
+                if (currentBooks.length === 1) {
+                    selectedBookIndex = 0;
+                    const selectedBook = currentBooks[0];
+                    currentBook = selectedBook.bog;
+                    darisListe = selectedBook.daris_liste || [];
+                    bookSelectContainer.classList.add('hidden');
+                    if (currentMode === 'halaqa') {
+                        halaqaMainOptions.classList.remove('hidden');
+                        halaqaDeltogSection.classList.add('hidden');
+                        halaqaAfbudSection.classList.add('hidden');
+                    } else if (currentMode === 'lordag') {
+                        lordagSection.classList.remove('hidden');
+                        lordagDato.value = '';
+                        lordagUgeNr.textContent = '-';
+                        lordagDarisContainer.classList.add('hidden');
+                        sendLordagData.classList.add('hidden');
+                        initLordagState();
+                    }
+                    return;
+                }
+                bookSelect.innerHTML = '<option value="">-- Vælg bog --</option>';
+                currentBooks.forEach((book, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = idx;
+                    opt.textContent = forkortBog(book.bog);
+                    bookSelect.appendChild(opt);
+                });
+                bookSelectContainer.classList.remove('hidden');
+                selectedBookIndex = null;
+                halaqaMainOptions.classList.add('hidden');
+                halaqaDeltogSection.classList.add('hidden');
+                halaqaAfbudSection.classList.add('hidden');
+                lordagSection.classList.add('hidden');
+            }
+
             mushrifSelect.addEventListener('change', (e) => {
                 const option = e.target.selectedOptions[0];
                 if (option && option.value) {
                     selectedMushrifId = option.value;
                     selectedMushrifNavn = option.textContent;
                     currentBooks = JSON.parse(option.dataset.books || '[]');
-
-                    if (currentBooks.length === 0) {
-                        alert('Denne mushref har ingen bøger endnu. Tilføj bøger i administrationssystemet.');
-                        bookSelectContainer.classList.add('hidden');
-                        return;
-                    }
-
-                    bookSelect.innerHTML = '<option value="">-- Vælg bog --</option>';
-                    currentBooks.forEach((book, idx) => {
-                        const opt = document.createElement('option');
-                        opt.value = idx;
-                        opt.textContent = forkortBog(book.bog);
-                        bookSelect.appendChild(opt);
-                    });
-                    bookSelectContainer.classList.remove('hidden');
-                    selectedBookIndex = null;
-                    // Skjul eventuelle aktive sektioner
-                    halaqaMainOptions.classList.add('hidden');
-                    halaqaDeltogSection.classList.add('hidden');
-                    halaqaAflystSection.classList.add('hidden');
-                    lordagSection.classList.add('hidden');
+                    handleBookSelectionAfterMushrif();
                 } else {
                     selectedMushrifId = null;
                     bookSelectContainer.classList.add('hidden');
+                    halaqaMainOptions.classList.add('hidden');
+                    lordagSection.classList.add('hidden');
                 }
             });
 
-            // Når bog vælges
             bookSelect.addEventListener('change', (e) => {
                 const idx = e.target.value;
                 if (idx === "") {
                     selectedBookIndex = null;
                     halaqaMainOptions.classList.add('hidden');
-                    halaqaDeltogSection.classList.add('hidden');
-                    halaqaAflystSection.classList.add('hidden');
                     lordagSection.classList.add('hidden');
                     return;
                 }
@@ -440,15 +537,12 @@
                 const selectedBook = currentBooks[selectedBookIndex];
                 currentBook = selectedBook.bog;
                 darisListe = selectedBook.daris_liste || [];
-
                 if (currentMode === 'halaqa') {
                     halaqaMainOptions.classList.remove('hidden');
                     halaqaDeltogSection.classList.add('hidden');
-                    halaqaAflystSection.classList.add('hidden');
+                    halaqaAfbudSection.classList.add('hidden');
                 } else if (currentMode === 'lordag') {
-                    // Vis direkte lørdagsmøde-sektion (uden ekstra knap)
                     lordagSection.classList.remove('hidden');
-                    // Nulstil dato og daris state
                     lordagDato.value = '';
                     lordagUgeNr.textContent = '-';
                     lordagDarisContainer.classList.add('hidden');
@@ -457,7 +551,66 @@
                 }
             });
 
-            // ========== HALAQA MODUL ==========
+            function setActiveHalaqaButton(activeBtn) {
+                [deltogBtn, halaqaAfbudBtn].forEach(btn => {
+                    if (btn === activeBtn) btn.classList.add('active');
+                    else btn.classList.remove('active');
+                });
+            }
+
+            deltogBtn.addEventListener('click', () => {
+                setActiveHalaqaButton(deltogBtn);
+                halaqaDeltogSection.classList.remove('hidden');
+                halaqaAfbudSection.classList.add('hidden');
+                halaqaDato.value = '';
+                halaqaUgeNr.textContent = '-';
+                halaqaSideTal.value = '';
+                initHalaqaDarisState();
+                opdaterHalaqaDeltogVisning();
+                fortrydHalaqaBtn.classList.add('hidden');
+                fortrydHalaqaAfbudBtn.classList.add('hidden');
+                lastInsertedId = null;
+            });
+
+            halaqaAfbudBtn.addEventListener('click', () => {
+                setActiveHalaqaButton(halaqaAfbudBtn);
+                halaqaAfbudSection.classList.remove('hidden');
+                halaqaDeltogSection.classList.add('hidden');
+                halaqaAfbudDato.value = '';
+                halaqaAfbudUgeNr.textContent = '-';
+                halaqaAfbudAarsagButtons.classList.add('hidden');
+                halaqaAfbudAarsagContainer.classList.add('hidden');
+                sendHalaqaAfbudData.classList.add('hidden');
+                halaqaAfbudType = null;
+                halaqaAfbudAarsagText.value = '';
+                fortrydHalaqaBtn.classList.add('hidden');
+                fortrydHalaqaAfbudBtn.classList.add('hidden');
+                lastInsertedId = null;
+            });
+
+            async function undoLastInsert() {
+                if (!lastInsertedId || !lastInsertedTable) {
+                    alert('Ingen data at fortryde.');
+                    return;
+                }
+                try {
+                    const { error } = await supabase
+                        .from(lastInsertedTable)
+                        .delete()
+                        .eq('id', lastInsertedId);
+                    if (error) throw error;
+                    alert('Sidste indsættelse blev fortrydt.');
+                    lastInsertedId = null;
+                    lastInsertedTable = null;
+                    fortrydHalaqaBtn.classList.add('hidden');
+                    fortrydHalaqaAfbudBtn.classList.add('hidden');
+                    fortrydLordagBtn.classList.add('hidden');
+                } catch (err) {
+                    alert('Kunne ikke fortryde: ' + err.message);
+                }
+            }
+
+            // Halaqa deltog
             function initHalaqaDarisState() {
                 halaqaDarisState = darisListe.map(navn => ({
                     navn,
@@ -482,14 +635,14 @@
                             <span><strong>Halaqa:</strong></span>
                             <select data-idx="${idx}" data-activity="halaqa">
                                 <option value="deltog" ${d.halaqaStatus === 'deltog' ? 'selected' : ''}>Deltog</option>
-                                <option value="aflystMed" ${d.halaqaStatus === 'aflystMed' ? 'selected' : ''}>Aflyst med årsag</option>
-                                <option value="aflystUden" ${d.halaqaStatus === 'aflystUden' ? 'selected' : ''}>Aflyst uden årsag</option>
+                                <option value="afbudMed" ${d.halaqaStatus === 'afbudMed' ? 'selected' : ''}>Afbud med årsag</option>
+                                <option value="afbudUden" ${d.halaqaStatus === 'afbudUden' ? 'selected' : ''}>Afbud uden årsag</option>
                             </select>
                             <span class="minutes-container ${d.halaqaStatus === 'deltog' ? '' : 'hidden'}" data-idx="${idx}" data-activity="halaqaMinutes">
                                 <input type="number" min="0" step="1" class="minutes-late" data-idx="${idx}" placeholder="min forsinket" value="${d.halaqaMinutesLate}">
                             </span>
                         </div>
-                        <div class="reason-field ${d.halaqaStatus === 'aflystMed' ? '' : 'hidden'}" data-reason="halaqa-${idx}">
+                        <div class="reason-field ${d.halaqaStatus === 'afbudMed' ? '' : 'hidden'}" data-reason="halaqa-${idx}">
                             <input type="text" placeholder="Årsag (halaqa)" value="${escapeHtml(d.halaqaReason)}">
                         </div>
                     </div>
@@ -499,14 +652,13 @@
                 halaqaPrevBtn.disabled = halaqaCurrentIndex === 0;
                 halaqaNextBtn.textContent = halaqaCurrentIndex === halaqaDarisState.length - 1 ? 'Færdig' : 'Næste →';
 
-                // Event listeners
                 halaqaCurrentDaris.querySelectorAll('select').forEach(select => {
                     select.addEventListener('change', (e) => {
-                        const idx = e.target.dataset.idx;
+                        const idx = parseInt(e.target.getAttribute('data-idx'));
                         const value = e.target.value;
                         const row = e.target.closest('.daris-row');
                         halaqaDarisState[idx].halaqaStatus = value;
-                        if (value !== 'aflystMed') halaqaDarisState[idx].halaqaReason = '';
+                        if (value !== 'afbudMed') halaqaDarisState[idx].halaqaReason = '';
                         const minutesContainer = row.querySelector(`.minutes-container[data-idx="${idx}"]`);
                         if (minutesContainer) minutesContainer.classList.toggle('hidden', value !== 'deltog');
                         if (value !== 'deltog') {
@@ -515,10 +667,9 @@
                             halaqaDarisState[idx].halaqaMinutesLate = '';
                         }
                         const reasonDiv = row.querySelector(`[data-reason="halaqa-${idx}"]`);
-                        if (reasonDiv) reasonDiv.classList.toggle('hidden', value !== 'aflystMed');
+                        if (reasonDiv) reasonDiv.classList.toggle('hidden', value !== 'afbudMed');
                     });
                 });
-
                 halaqaCurrentDaris.querySelectorAll('.reason-field input').forEach(input => {
                     input.addEventListener('input', (e) => {
                         const parent = e.target.closest('.reason-field');
@@ -529,17 +680,16 @@
                         }
                     });
                 });
-
                 halaqaCurrentDaris.querySelectorAll('.minutes-late').forEach(input => {
                     input.addEventListener('input', (e) => {
-                        const idx = e.target.dataset.idx;
+                        const idx = parseInt(e.target.getAttribute('data-idx'));
                         halaqaDarisState[idx].halaqaMinutesLate = e.target.value;
                     });
                 });
             }
 
             function opdaterHalaqaDeltogVisning() {
-                const harDato = halaqaDato.value.trim() !== '';
+                const harDato = halaqaDato.value !== '';
                 if (harDato) {
                     halaqaSideTalContainer.classList.remove('hidden');
                 } else {
@@ -558,149 +708,101 @@
                 }
             }
 
-            halaqaDato.addEventListener('change', (e) => {
-                if (e.target.value) {
-                    const date = new Date(e.target.value);
-                    halaqaUgeNr.textContent = getWeekNumber(date);
-                } else {
-                    halaqaUgeNr.textContent = '-';
-                }
-                opdaterHalaqaDeltogVisning();
-            });
-
             halaqaSideTal.addEventListener('input', opdaterHalaqaDeltogVisning);
-
             halaqaPrevBtn.addEventListener('click', () => {
                 if (halaqaCurrentIndex > 0) {
                     halaqaCurrentIndex--;
                     renderHalaqaCurrentDaris();
                 }
             });
-
             halaqaNextBtn.addEventListener('click', () => {
                 if (halaqaCurrentIndex < halaqaDarisState.length - 1) {
                     halaqaCurrentIndex++;
                     renderHalaqaCurrentDaris();
                 } else {
-                    alert('Du har gennemgået alle daris. Klik på "Send Halaqa-data" for at gemme.');
+                    alert('Gennemgået alle daris. Klik Send.');
                 }
             });
 
-            // Halaqa: "Jeg deltog i Halaqa"
-            deltogBtn.addEventListener('click', () => {
-                halaqaDeltogSection.classList.remove('hidden');
-                halaqaAflystSection.classList.add('hidden');
-                halaqaDato.value = '';
-                halaqaUgeNr.textContent = '-';
-                halaqaSideTal.value = '';
-                initHalaqaDarisState();
-                opdaterHalaqaDeltogVisning();
-            });
-
-            // Halaqa: "Halaqa aflyst"
-            halaqaAflystBtn.addEventListener('click', () => {
-                halaqaAflystSection.classList.remove('hidden');
-                halaqaDeltogSection.classList.add('hidden');
-                halaqaAflystDato.value = '';
-                halaqaAflystUgeNr.textContent = '-';
-                halaqaAflystAarsagButtons.classList.add('hidden');
-                halaqaAarsagContainer.classList.add('hidden');
-                sendHalaqaAflystData.classList.add('hidden');
-                halaqaAflystType = null;
-                halaqaAarsagText.value = '';
-            });
-
-            halaqaAflystDato.addEventListener('change', (e) => {
-                if (e.target.value) {
-                    const date = new Date(e.target.value);
-                    halaqaAflystUgeNr.textContent = getWeekNumber(date);
-                    halaqaAflystAarsagButtons.classList.remove('hidden');
-                } else {
-                    halaqaAflystUgeNr.textContent = '-';
-                    halaqaAflystAarsagButtons.classList.add('hidden');
-                    halaqaAarsagContainer.classList.add('hidden');
-                    sendHalaqaAflystData.classList.add('hidden');
-                }
-            });
-
-            halaqaAflystMedAarsag.addEventListener('click', () => {
-                halaqaAflystType = 'med';
-                halaqaAarsagContainer.classList.remove('hidden');
-                sendHalaqaAflystData.classList.remove('hidden');
-            });
-
-            halaqaAflystUdenAarsag.addEventListener('click', () => {
-                halaqaAflystType = 'uden';
-                halaqaAarsagContainer.classList.add('hidden');
-                halaqaAarsagText.value = '';
-                sendHalaqaAflystData.classList.remove('hidden');
-            });
-
-            // Send Halaqa-deltog data
             sendHalaqaDeltogData.addEventListener('click', async () => {
                 if (!selectedMushrifId || selectedBookIndex === null) return alert('Vælg mushref og bog');
                 if (!halaqaDato.value) return alert('Vælg dato');
-                if (!halaqaSideTal.value.trim()) return alert('Udfyld sidetal');
-
-                const dato = halaqaDato.value;
-                const uge = getWeekNumber(new Date(dato));
+                const dateObj = new Date(halaqaDato.value);
+                if (isNaN(dateObj.getTime())) return alert('Ugyldig dato');
+                const uge = getWeekNumber(dateObj);
                 const sideTal = halaqaSideTal.value.trim();
-
-                const darisData = halaqaDarisState.map(d => ({
-                    navn: d.navn,
-                    halaqa: { status: d.halaqaStatus, reason: d.halaqaReason },
-                    lordag: null
-                }));
+                if (!sideTal) return alert('Udfyld sidetal');
+                const darisData = halaqaDarisState.map(d => ({ navn: d.navn, halaqa: { status: d.halaqaStatus, reason: d.halaqaReason } }));
                 const minutesLateArray = halaqaDarisState.map(d => d.halaqaMinutesLate ? parseInt(d.halaqaMinutesLate) : null);
-
                 try {
-                    const { error } = await supabase.from('mushrif_daris_log').insert([{
+                    const { data, error } = await supabase.from('halaqa_log').insert([{
                         mushref: selectedMushrifNavn,
-                        dato, uge, bog: currentBook, side_tal: sideTal,
+                        dato: formatDanishDate(dateObj),
+                        uge,
+                        bog: currentBook,
+                        side_tal: sideTal,
                         deltog: true,
-                        aflyst_med_aarsag: null, aflyst_uden_aarsag: null,
+                        afbud_med_aarsag: null,
+                        afbud_uden_aarsag: null,
                         daris: darisData,
                         halaqa_minutes_late: minutesLateArray,
                         created_at: new Date().toISOString()
-                    }]);
+                    }]).select();
                     if (error) throw error;
                     alert('Halaqa-data gemt!');
-                } catch (err) {
-                    console.error(err);
-                    alert('Fejl: ' + err.message);
-                }
+                    if (data && data[0]) {
+                        lastInsertedId = data[0].id;
+                        lastInsertedTable = 'halaqa_log';
+                        fortrydHalaqaBtn.classList.remove('hidden');
+                    }
+                } catch (err) { alert('Fejl: ' + err.message); }
             });
 
-            // Send Halaqa-aflyst data
-            sendHalaqaAflystData.addEventListener('click', async () => {
+            // Halaqa afbud
+            halaqaAfbudMedAarsag.addEventListener('click', () => {
+                halaqaAfbudType = 'med';
+                halaqaAfbudAarsagContainer.classList.remove('hidden');
+                sendHalaqaAfbudData.classList.remove('hidden');
+            });
+            halaqaAfbudUdenAarsag.addEventListener('click', () => {
+                halaqaAfbudType = 'uden';
+                halaqaAfbudAarsagContainer.classList.add('hidden');
+                halaqaAfbudAarsagText.value = '';
+                sendHalaqaAfbudData.classList.remove('hidden');
+            });
+            sendHalaqaAfbudData.addEventListener('click', async () => {
                 if (!selectedMushrifId || selectedBookIndex === null) return alert('Vælg mushref og bog');
-                if (!halaqaAflystDato.value) return alert('Vælg dato');
-                if (!halaqaAflystType) return alert('Vælg aflyst med/uden årsag');
-                if (halaqaAflystType === 'med' && !halaqaAarsagText.value.trim()) return alert('Skriv en årsag');
-
-                const dato = halaqaAflystDato.value;
-                const uge = getWeekNumber(new Date(dato));
-
+                if (!halaqaAfbudDato.value) return alert('Vælg dato');
+                const dateObj = new Date(halaqaAfbudDato.value);
+                if (isNaN(dateObj.getTime())) return alert('Ugyldig dato');
+                if (!halaqaAfbudType) return alert('Vælg afbud med/uden årsag');
+                if (halaqaAfbudType === 'med' && !halaqaAfbudAarsagText.value.trim()) return alert('Skriv en årsag');
+                const uge = getWeekNumber(dateObj);
                 try {
-                    const { error } = await supabase.from('mushrif_daris_log').insert([{
+                    const { data, error } = await supabase.from('halaqa_log').insert([{
                         mushref: selectedMushrifNavn,
-                        dato, uge, bog: currentBook, side_tal: null,
+                        dato: formatDanishDate(dateObj),
+                        uge,
+                        bog: currentBook,
+                        side_tal: null,
                         deltog: false,
-                        aflyst_med_aarsag: halaqaAflystType === 'med' ? halaqaAarsagText.value.trim() : null,
-                        aflyst_uden_aarsag: halaqaAflystType === 'uden',
+                        afbud_med_aarsag: halaqaAfbudType === 'med' ? halaqaAfbudAarsagText.value.trim() : null,
+                        afbud_uden_aarsag: halaqaAfbudType === 'uden',
                         daris: [],
                         halaqa_minutes_late: null,
                         created_at: new Date().toISOString()
-                    }]);
+                    }]).select();
                     if (error) throw error;
-                    alert('Aflysning gemt!');
-                } catch (err) {
-                    console.error(err);
-                    alert('Fejl: ' + err.message);
-                }
+                    alert('Afbud gemt!');
+                    if (data && data[0]) {
+                        lastInsertedId = data[0].id;
+                        lastInsertedTable = 'halaqa_log';
+                        fortrydHalaqaAfbudBtn.classList.remove('hidden');
+                    }
+                } catch (err) { alert('Fejl: ' + err.message); }
             });
 
-            // ========== LØRDAGSMØDE MODUL ==========
+            // Lørdagsmøde
             function initLordagState() {
                 lordagDarisState = darisListe.map(navn => ({
                     navn,
@@ -724,11 +826,11 @@
                             <span><strong>Lørdagsmøde:</strong></span>
                             <select data-idx="${idx}" data-activity="lordag">
                                 <option value="deltog" ${d.lordagStatus === 'deltog' ? 'selected' : ''}>Deltog</option>
-                                <option value="aflystMed" ${d.lordagStatus === 'aflystMed' ? 'selected' : ''}>Aflyst med årsag</option>
-                                <option value="aflystUden" ${d.lordagStatus === 'aflystUden' ? 'selected' : ''}>Aflyst uden årsag</option>
+                                <option value="afbudMed" ${d.lordagStatus === 'afbudMed' ? 'selected' : ''}>Afbud med årsag</option>
+                                <option value="afbudUden" ${d.lordagStatus === 'afbudUden' ? 'selected' : ''}>Afbud uden årsag</option>
                             </select>
                         </div>
-                        <div class="reason-field ${d.lordagStatus === 'aflystMed' ? '' : 'hidden'}" data-reason="lordag-${idx}">
+                        <div class="reason-field ${d.lordagStatus === 'afbudMed' ? '' : 'hidden'}" data-reason="lordag-${idx}">
                             <input type="text" placeholder="Årsag (lørdag)" value="${escapeHtml(d.lordagReason)}">
                         </div>
                     </div>
@@ -740,16 +842,15 @@
 
                 lordagCurrentDaris.querySelectorAll('select').forEach(select => {
                     select.addEventListener('change', (e) => {
-                        const idx = e.target.dataset.idx;
+                        const idx = parseInt(e.target.getAttribute('data-idx'));
                         const value = e.target.value;
                         const row = e.target.closest('.daris-row');
                         lordagDarisState[idx].lordagStatus = value;
-                        if (value !== 'aflystMed') lordagDarisState[idx].lordagReason = '';
+                        if (value !== 'afbudMed') lordagDarisState[idx].lordagReason = '';
                         const reasonDiv = row.querySelector(`[data-reason="lordag-${idx}"]`);
-                        if (reasonDiv) reasonDiv.classList.toggle('hidden', value !== 'aflystMed');
+                        if (reasonDiv) reasonDiv.classList.toggle('hidden', value !== 'afbudMed');
                     });
                 });
-
                 lordagCurrentDaris.querySelectorAll('.reason-field input').forEach(input => {
                     input.addEventListener('input', (e) => {
                         const parent = e.target.closest('.reason-field');
@@ -765,7 +866,7 @@
             function opdaterLordagVisning() {
                 if (lordagDato.value) {
                     lordagDarisContainer.classList.remove('hidden');
-                    if (lordagDarisState.length > 0) {
+                    if (lordagDarisState.length) {
                         renderLordagCurrentDaris();
                         sendLordagData.classList.remove('hidden');
                     }
@@ -775,94 +876,78 @@
                 }
             }
 
-            lordagDato.addEventListener('change', (e) => {
-                if (e.target.value) {
-                    const date = new Date(e.target.value);
-                    lordagUgeNr.textContent = getWeekNumber(date);
-                    initLordagState();
-                    opdaterLordagVisning();
-                } else {
-                    lordagUgeNr.textContent = '-';
-                    lordagDarisContainer.classList.add('hidden');
-                    sendLordagData.classList.add('hidden');
-                }
-            });
-
             lordagPrevBtn.addEventListener('click', () => {
                 if (lordagCurrentIndex > 0) {
                     lordagCurrentIndex--;
                     renderLordagCurrentDaris();
                 }
             });
-
             lordagNextBtn.addEventListener('click', () => {
                 if (lordagCurrentIndex < lordagDarisState.length - 1) {
                     lordagCurrentIndex++;
                     renderLordagCurrentDaris();
                 } else {
-                    alert('Du har gennemgået alle daris. Klik på "Send Lørdagsmøde-data" for at gemme.');
+                    alert('Gennemgået alle daris. Klik Send.');
                 }
             });
-
             sendLordagData.addEventListener('click', async () => {
                 if (!selectedMushrifId || selectedBookIndex === null) return alert('Vælg mushref og bog');
                 if (!lordagDato.value) return alert('Vælg dato');
-
-                const dato = lordagDato.value;
-                const uge = getWeekNumber(new Date(dato));
-                const darisData = lordagDarisState.map(d => ({
-                    navn: d.navn,
-                    lordag: { status: d.lordagStatus, reason: d.lordagReason }
-                }));
-
+                const dateObj = new Date(lordagDato.value);
+                if (isNaN(dateObj.getTime())) return alert('Ugyldig dato');
+                const uge = getWeekNumber(dateObj);
+                const darisData = lordagDarisState.map(d => ({ navn: d.navn, lordag: { status: d.lordagStatus, reason: d.lordagReason } }));
                 try {
-                    const { error } = await supabase.from('mushrif_daris_log').insert([{
+                    const { data, error } = await supabase.from('lordag_log').insert([{
                         mushref: selectedMushrifNavn,
-                        dato, uge, bog: currentBook, side_tal: null,
-                        deltog: false,
-                        aflyst_med_aarsag: 'Lørdagsmøde registrering', // markerer at det er et lørdagsmøde
-                        aflyst_uden_aarsag: false,
+                        dato: formatDanishDate(dateObj),
+                        uge,
+                        bog: currentBook,
                         daris: darisData,
-                        halaqa_minutes_late: null,
                         created_at: new Date().toISOString()
-                    }]);
+                    }]).select();
                     if (error) throw error;
                     alert('Lørdagsmøde-data gemt!');
-                } catch (err) {
-                    console.error(err);
-                    alert('Fejl: ' + err.message);
-                }
+                    if (data && data[0]) {
+                        lastInsertedId = data[0].id;
+                        lastInsertedTable = 'lordag_log';
+                        fortrydLordagBtn.classList.remove('hidden');
+                    }
+                } catch (err) { alert('Fejl: ' + err.message); }
             });
 
-            // ========== MODULVALG (Halaqa / Lørdagsmøde) ==========
+            fortrydHalaqaBtn.addEventListener('click', undoLastInsert);
+            fortrydHalaqaAfbudBtn.addEventListener('click', undoLastInsert);
+            fortrydLordagBtn.addEventListener('click', undoLastInsert);
+
             function resetAll() {
                 mushrifBookSection.classList.add('hidden');
                 bookSelectContainer.classList.add('hidden');
                 halaqaMainOptions.classList.add('hidden');
                 halaqaDeltogSection.classList.add('hidden');
-                halaqaAflystSection.classList.add('hidden');
+                halaqaAfbudSection.classList.add('hidden');
                 lordagSection.classList.add('hidden');
                 selectedMushrifId = null;
                 selectedBookIndex = null;
                 mushrifSelect.value = '';
                 bookSelect.innerHTML = '<option value="">-- Vælg bog --</option>';
+                [deltogBtn, halaqaAfbudBtn].forEach(btn => btn.classList.remove('active'));
+                [fortrydHalaqaBtn, fortrydHalaqaAfbudBtn, fortrydLordagBtn].forEach(btn => btn.classList.add('hidden'));
+                lastInsertedId = null;
+                lastInsertedTable = null;
             }
 
             halaqaModeBtn.addEventListener('click', () => {
                 currentMode = 'halaqa';
                 resetAll();
                 mushrifBookSection.classList.remove('hidden');
-                // Når bog er valgt, vises halaqaMainOptions via bookSelect change
             });
-
             lordagModeBtn.addEventListener('click', () => {
                 currentMode = 'lordag';
                 resetAll();
                 mushrifBookSection.classList.remove('hidden');
-                // Når bog er valgt, vises lordagSection via bookSelect change
             });
 
-            // Start
             loadMushrifs();
         })();
     </script>
