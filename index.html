@@ -441,25 +441,42 @@
                 return String(str).replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
             }
 
-            async function loadMushrifs() {
+           async function loadMushrifs() {
                 try {
-                    const { data, error } = await supabase
+                    // 1. Hent aktive personer med rollen 'mushrif' fra personer-tabellen
+                    const { data: persons, error: personsError } = await supabase
                         .from('personer')
-                        .select('id, navn, books_taught, roles')
+                        .select('id, navn, roles')
                         .eq('is_active', true)
                         .order('navn');
-                    if (error) throw error;
-                    const mushrifs = (data || []).filter(p => p.roles && Array.isArray(p.roles) && p.roles.includes('mushrif'));
-                    mushrifSelect.innerHTML = '<option value="">-- Vælg --</option>';
+                    if (personsError) throw personsError;
+
+                    // Filtrér i JavaScript for at undgå JSONB-problemer
+                    const mushrifs = (persons || []).filter(p => p.roles && Array.isArray(p.roles) && p.roles.includes('mushrif'));
+
                     if (mushrifs.length === 0) {
                         mushrifSelect.innerHTML = '<option value="">-- Ingen aktive mushrifs --</option>';
                         return;
                     }
+
+                    // 2. Hent bøger og daris fra mushref_relations (den autoritative kilde)
+                    const { data: relations, error: relError } = await supabase
+                        .from('mushrif_relations')
+                        .select('mushrif_navn, books');
+                    if (relError) throw relError;
+
+                    // Byg et map fra mushrif_navn til books (med daris_liste)
+                    const booksMap = new Map();
+                    relations.forEach(rel => {
+                        booksMap.set(rel.mushrif_navn, rel.books || []);
+                    });
+
+                    mushrifSelect.innerHTML = '<option value="">-- Vælg --</option>';
                     mushrifs.forEach(p => {
                         const option = document.createElement('option');
                         option.value = p.id;
                         option.textContent = p.navn;
-                        const books = Array.isArray(p.books_taught) ? p.books_taught : [];
+                        const books = booksMap.get(p.navn) || [];
                         option.dataset.books = JSON.stringify(books);
                         mushrifSelect.appendChild(option);
                     });
@@ -468,6 +485,7 @@
                     alert('Kunne ikke hente aktive mushrifs: ' + err.message);
                 }
             }
+
 
             function handleBookSelectionAfterMushrif() {
                 if (currentBooks.length === 0) {
