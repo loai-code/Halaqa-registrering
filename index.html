@@ -755,7 +755,7 @@
                 try {
                     const { data, error } = await supabase.from('halaqa_log').insert([{
                         mushref: selectedMushrifNavn,
-                        dato: formatDanishDate(dateObj),
+                        dato: halaqaDato.value,   // input type="date" giver allerede ISO-streng
                         uge,
                         bog: currentBook,
                         side_tal: sideTal,
@@ -799,7 +799,7 @@
                 try {
                     const { data, error } = await supabase.from('halaqa_log').insert([{
                         mushref: selectedMushrifNavn,
-                        dato: formatDanishDate(dateObj),
+                        dato: halaqaDato.value,   // input type="date" giver allerede ISO-streng
                         uge,
                         bog: currentBook,
                         side_tal: null,
@@ -918,7 +918,7 @@
                 try {
                     const { data, error } = await supabase.from('lordag_log').insert([{
                         mushref: selectedMushrifNavn,
-                        dato: formatDanishDate(dateObj),
+                        dato: halaqaDato.value,   // input type="date" giver allerede ISO-streng
                         uge,
                         bog: currentBook,
                         daris: darisData,
