@@ -167,7 +167,6 @@
             font-size: 1.2rem;
             padding: 12px 24px;
             flex: 0 1 auto;
-            max-width: 100%;
         }
 
         .date-field {
@@ -253,16 +252,8 @@
                 <input type="date" id="halaqaAfbudDato">
             </div>
             <p>Uge nummer: <span id="halaqaAfbudUgeNr">-</span></p>
-            <div id="halaqaAfbudAarsagButtons" class="btn-group hidden">
-                <button id="halaqaAfbudMedAarsag" class="secondary">Afbud med årsag</button>
-                <button id="halaqaAfbudUdenAarsag" class="secondary">Afbud uden årsag</button>
-            </div>
-            <div id="halaqaAfbudAarsagContainer" class="hidden">
-                <label for="halaqaAfbudAarsagText">Årsag:</label><textarea id="halaqaAfbudAarsagText" rows="3"
-                    placeholder="Skriv årsag..."></textarea>
-            </div>
             <div class="btn-group">
-                <button id="sendHalaqaAfbudData" class="primary hidden">📤 Send aflysningsdata</button>
+                <button id="sendHalaqaAfbudData" class="primary hidden">📤 Send Aflysnings-data</button>
                 <button id="fortrydHalaqaAfbudBtn" class="secondary hidden">↩️ Fortryd</button>
             </div>
         </div>
@@ -325,11 +316,6 @@
 
             const halaqaAfbudDato = document.getElementById('halaqaAfbudDato');
             const halaqaAfbudUgeNr = document.getElementById('halaqaAfbudUgeNr');
-            const halaqaAfbudAarsagButtons = document.getElementById('halaqaAfbudAarsagButtons');
-            const halaqaAfbudMedAarsag = document.getElementById('halaqaAfbudMedAarsag');
-            const halaqaAfbudUdenAarsag = document.getElementById('halaqaAfbudUdenAarsag');
-            const halaqaAfbudAarsagContainer = document.getElementById('halaqaAfbudAarsagContainer');
-            const halaqaAfbudAarsagText = document.getElementById('halaqaAfbudAarsagText');
             const sendHalaqaAfbudData = document.getElementById('sendHalaqaAfbudData');
             const fortrydHalaqaAfbudBtn = document.getElementById('fortrydHalaqaAfbudBtn');
 
@@ -355,34 +341,12 @@
 
             let halaqaDarisState = [];
             let halaqaCurrentIndex = 0;
-            let halaqaAfbudType = null;
 
             let lordagDarisState = [];
             let lordagCurrentIndex = 0;
 
             let lastInsertedId = null;
             let lastInsertedTable = null;
-
-            // Dato hjælpefunktioner (konverter ISO til dansk visning)
-            function formatDanishDate(date) {
-                if (!date) return '';
-                const d = new Date(date);
-                const day = d.getDate().toString().padStart(2, '0');
-                const month = (d.getMonth() + 1).toString().padStart(2, '0');
-                const year = d.getFullYear();
-                return `${day}-${month}-${year}`;
-            }
-
-            function parseDanishDate(dateStr) {
-                if (!dateStr) return null;
-                const parts = dateStr.split('-');
-                if (parts.length !== 3) return null;
-                const day = parseInt(parts[0], 10);
-                const month = parseInt(parts[1], 10) - 1;
-                const year = parseInt(parts[2], 10);
-                if (isNaN(day) || isNaN(month + 1) || isNaN(year)) return null;
-                return new Date(year, month, day);
-            }
 
             function getWeekNumber(date) {
                 const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -392,14 +356,12 @@
                 return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
             }
 
-            // Omdan dato fra input (ISO yyyy-mm-dd) til dansk tekst og opdater ugenummer
             function setupDateInput(inputElement, weekSpan, callback) {
                 inputElement.addEventListener('change', () => {
                     if (inputElement.value) {
                         const date = new Date(inputElement.value);
                         if (!isNaN(date.getTime())) {
-                            const week = getWeekNumber(date);
-                            weekSpan.textContent = week;
+                            weekSpan.textContent = getWeekNumber(date);
                         } else {
                             weekSpan.textContent = '-';
                         }
@@ -408,7 +370,6 @@
                     }
                     if (callback) callback();
                 });
-                // Hvis der er en eksisterende værdi (ved redigering), kør med det samme
                 if (inputElement.value) {
                     const date = new Date(inputElement.value);
                     if (!isNaN(date.getTime())) {
@@ -418,10 +379,15 @@
             }
 
             setupDateInput(halaqaDato, halaqaUgeNr, () => opdaterHalaqaDeltogVisning());
-            setupDateInput(halaqaAfbudDato, halaqaAfbudUgeNr, null);
+            setupDateInput(halaqaAfbudDato, halaqaAfbudUgeNr, () => {
+                if (halaqaAfbudDato.value) {
+                    sendHalaqaAfbudData.classList.remove('hidden');
+                } else {
+                    sendHalaqaAfbudData.classList.add('hidden');
+                }
+            });
             setupDateInput(lordagDato, lordagUgeNr, () => opdaterLordagVisning());
 
-            // Bog-forkortelse
             function forkortBog(bog) {
                 const mapping = {
                     'Nidham al-Islam (Islams system)': 'Nidham',
@@ -441,36 +407,25 @@
                 return String(str).replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
             }
 
-           async function loadMushrifs() {
+            async function loadMushrifs() {
                 try {
-                    // 1. Hent aktive personer med rollen 'mushrif' fra personer-tabellen
                     const { data: persons, error: personsError } = await supabase
                         .from('personer')
                         .select('id, navn, roles')
                         .eq('is_active', true)
                         .order('navn');
                     if (personsError) throw personsError;
-
-                    // Filtrér i JavaScript for at undgå JSONB-problemer
                     const mushrifs = (persons || []).filter(p => p.roles && Array.isArray(p.roles) && p.roles.includes('mushrif'));
-
                     if (mushrifs.length === 0) {
                         mushrifSelect.innerHTML = '<option value="">-- Ingen aktive mushrifs --</option>';
                         return;
                     }
-
-                    // 2. Hent bøger og daris fra mushref_relations (den autoritative kilde)
                     const { data: relations, error: relError } = await supabase
                         .from('mushrif_relations')
                         .select('mushrif_navn, books');
                     if (relError) throw relError;
-
-                    // Byg et map fra mushrif_navn til books (med daris_liste)
                     const booksMap = new Map();
-                    relations.forEach(rel => {
-                        booksMap.set(rel.mushrif_navn, rel.books || []);
-                    });
-
+                    relations.forEach(rel => booksMap.set(rel.mushrif_navn, rel.books || []));
                     mushrifSelect.innerHTML = '<option value="">-- Vælg --</option>';
                     mushrifs.forEach(p => {
                         const option = document.createElement('option');
@@ -485,7 +440,6 @@
                     alert('Kunne ikke hente aktive mushrifs: ' + err.message);
                 }
             }
-
 
             function handleBookSelectionAfterMushrif() {
                 if (currentBooks.length === 0) {
@@ -596,12 +550,7 @@
                 halaqaDeltogSection.classList.add('hidden');
                 halaqaAfbudDato.value = '';
                 halaqaAfbudUgeNr.textContent = '-';
-                halaqaAfbudAarsagButtons.classList.add('hidden');
-                halaqaAfbudAarsagContainer.classList.add('hidden');
                 sendHalaqaAfbudData.classList.add('hidden');
-                halaqaAfbudType = null;
-                halaqaAfbudAarsagText.value = '';
-                fortrydHalaqaBtn.classList.add('hidden');
                 fortrydHalaqaAfbudBtn.classList.add('hidden');
                 lastInsertedId = null;
             });
@@ -755,7 +704,7 @@
                 try {
                     const { data, error } = await supabase.from('halaqa_log').insert([{
                         mushref: selectedMushrifNavn,
-                        dato: halaqaDato.value,   // input type="date" giver allerede ISO-streng
+                        dato: halaqaDato.value,
                         uge,
                         bog: currentBook,
                         side_tal: sideTal,
@@ -776,42 +725,37 @@
                 } catch (err) { alert('Fejl: ' + err.message); }
             });
 
-            // Halaqa afbud
-            halaqaAfbudMedAarsag.addEventListener('click', () => {
-                halaqaAfbudType = 'med';
-                halaqaAfbudAarsagContainer.classList.remove('hidden');
-                sendHalaqaAfbudData.classList.remove('hidden');
-            });
-            halaqaAfbudUdenAarsag.addEventListener('click', () => {
-                halaqaAfbudType = 'uden';
-                halaqaAfbudAarsagContainer.classList.add('hidden');
-                halaqaAfbudAarsagText.value = '';
-                sendHalaqaAfbudData.classList.remove('hidden');
-            });
+            // Halaqa aflyst (hele halaqa aflyst)
+          // Halaqa aflyst (hele halaqa aflyst) - med daris udfyldt
             sendHalaqaAfbudData.addEventListener('click', async () => {
                 if (!selectedMushrifId || selectedBookIndex === null) return alert('Vælg mushref og bog');
                 if (!halaqaAfbudDato.value) return alert('Vælg dato');
                 const dateObj = new Date(halaqaAfbudDato.value);
                 if (isNaN(dateObj.getTime())) return alert('Ugyldig dato');
-                if (!halaqaAfbudType) return alert('Vælg afbud med/uden årsag');
-                if (halaqaAfbudType === 'med' && !halaqaAfbudAarsagText.value.trim()) return alert('Skriv en årsag');
                 const uge = getWeekNumber(dateObj);
+
+                // Opret daris array for hver daris med status "aflyst"
+                const darisData = darisListe.map(navn => ({
+                    navn: navn,
+                    halaqa: { status: 'aflyst', reason: 'Hele halaqa aflyst' }
+                }));
+
                 try {
                     const { data, error } = await supabase.from('halaqa_log').insert([{
                         mushref: selectedMushrifNavn,
-                        dato: halaqaDato.value,   // input type="date" giver allerede ISO-streng
+                        dato: halaqaAfbudDato.value,
                         uge,
                         bog: currentBook,
                         side_tal: null,
                         deltog: false,
-                        afbud_med_aarsag: halaqaAfbudType === 'med' ? halaqaAfbudAarsagText.value.trim() : null,
-                        afbud_uden_aarsag: halaqaAfbudType === 'uden',
-                        daris: [],
+                        afbud_med_aarsag: 'Hele halaqa aflyst',
+                        afbud_uden_aarsag: null,
+                        daris: darisData,
                         halaqa_minutes_late: null,
                         created_at: new Date().toISOString()
                     }]).select();
                     if (error) throw error;
-                    alert('Afbud gemt!');
+                    alert('Halaqa aflyst og gemt!');
                     if (data && data[0]) {
                         lastInsertedId = data[0].id;
                         lastInsertedTable = 'halaqa_log';
@@ -819,7 +763,7 @@
                     }
                 } catch (err) { alert('Fejl: ' + err.message); }
             });
-
+            
             // Lørdagsmøde
             function initLordagState() {
                 lordagDarisState = darisListe.map(navn => ({
@@ -918,7 +862,7 @@
                 try {
                     const { data, error } = await supabase.from('lordag_log').insert([{
                         mushref: selectedMushrifNavn,
-                        dato: halaqaDato.value,   // input type="date" giver allerede ISO-streng
+                        dato: lordagDato.value,
                         uge,
                         bog: currentBook,
                         daris: darisData,
