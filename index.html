@@ -477,7 +477,7 @@
                 </div>
             </div>
 
-            <!-- Lørdagsmøde-modul (nu med to knapper) -->
+            <!-- Lørdagsmøde-modul -->
             <div id="lordagMainOptions" class="btn-group hidden">
                 <button id="lordagDeltogBtn" class="primary">✅ Jeg deltog i Lørdagsmødet</button>
                 <button id="lordagAfbudBtn" class="secondary">❌ Lørdagsmødet aflyst</button>
@@ -718,7 +718,7 @@
                 return String(str).replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
             }
 
-            // ----- LOGIN -----
+            // ----- LOGIN (case‑insensitive) -----
             async function handleLogin(e) {
                 e.preventDefault();
                 const navn = loginNavn.value.trim();
@@ -733,10 +733,11 @@
                 loginBtn.textContent = 'Logger ind...';
 
                 try {
+                    // Brug .ilike for case‑insensitive søgning
                     const { data: user, error } = await supabase
                         .from('users')
                         .select('id, navn, password_hash')
-                        .eq('navn', navn)
+                        .ilike('navn', navn)
                         .maybeSingle();
 
                     if (error || !user) {
@@ -757,6 +758,7 @@
                     }
 
                     loginError.classList.remove('show');
+                    // Gem det præcise navn fra databasen (med korrekt casing)
                     localStorage.setItem('loggedInUser', JSON.stringify({
                         id: user.id,
                         navn: user.navn
