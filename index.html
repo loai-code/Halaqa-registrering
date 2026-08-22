@@ -719,7 +719,7 @@
                 return String(str).replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m]));
             }
 
-            // ----- HENT MUSHRIFS (KUN MUSHRIFS) – bruger JavaScript filtrering som i den gamle kode -----
+            // ----- HENT MUSHRIFS (KUN MUSHRIFS) – bruger JavaScript filtrering -----
             async function loadMushrifsForMaster() {
                 try {
                     const { data: persons, error } = await supabase
@@ -1409,6 +1409,7 @@
                 }
             });
 
+            // FJERNET deltog fra lordag_log indsættelser
             sendLordagDeltogData.addEventListener('click', async () => {
                 if (!selectedMushrifId || selectedBookIndex === null) return alert('Vælg bog');
                 if (!lordagDato.value) return alert('Vælg dato');
@@ -1422,7 +1423,6 @@
                         dato: lordagDato.value,
                         uge,
                         bog: currentBook,
-                        deltog: true,
                         daris: darisData,
                         created_at: new Date().toISOString()
                     }]).select();
@@ -1454,7 +1454,6 @@
                         dato: lordagAfbudDato.value,
                         uge,
                         bog: currentBook,
-                        deltog: true,
                         daris: darisData,
                         created_at: new Date().toISOString()
                     }]).select();
